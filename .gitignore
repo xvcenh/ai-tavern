@@ -1,0 +1,5 @@
+# AI Tavern
+.env
+.DS_Store
+node_modules/
+*.log

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Tavern — 龙与地下城 AI小镇</title>
+  <meta name="description" content="An open-source D&D-style AI town. Explore a fantasy world with an AI Dungeon Master. Roll dice, fight monsters, go on quests.">
+  <meta name="theme-color" content="#1a0a2e">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="AI Tavern — AI驱动的D&D幻想小镇">
+  <meta property="og:description" content="一个开源AI Dungeon Master主持的幻想小镇。和有个性的NPC交谈，掷骰决定命运，探索无限可能。">
+  <meta property="og:type" content="website">
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="loading-spinner"></div>
+  <h1>🏰 AI 小镇</h1>
+  <p>AI Dungeon Master 正在准备你的冒险...</p>
+</div>
+
+<!-- Main App -->
+<div id="app" style="display:none">
+  
+  <!-- Game View -->
+  <div id="game-view">
+    <canvas id="game-canvas"></canvas>
+    <div id="game-overlay">
+      <div id="daynight-indicator">☀️ 白天 12:00</div>
+      <div id="location-label">🌿 旷野</div>
+    </div>
+  </div>
+  
+  <!-- Side Panel -->
+  <div id="side-panel">
+    <div id="side-tabs">
+      <button class="active" data-tab="character">👤 角色</button>
+      <button data-tab="inventory">🎒 物品</button>
+      <button data-tab="quests">📜 任务</button>
+    </div>
+    <div id="side-content">
+      <div class="tab-content active" id="tab-character"></div>
+      <div class="tab-content" id="tab-inventory"></div>
+      <div class="tab-content" id="tab-quests"></div>
+    </div>
+  </div>
+  
+  <!-- Bottom Panel -->
+  <div id="bottom-panel">
+    <div id="dm-narration">
+      <div class="narr-entry dm">
+        <div class="narr-speaker">DUNGEON MASTER</div>
+        <div>欢迎来到月影镇。按下 Esc 打开菜单开始配置。</div>
+      </div>
+    </div>
+    <div id="input-area">
+      <button id="btn-talk" class="action-btn" title="交谈">💬</button>
+      <button id="btn-search" class="action-btn" title="搜索">🔍</button>
+      <button id="btn-rest" class="action-btn" title="休息">💤</button>
+      <button id="btn-dice" class="action-btn" title="掷骰">🎲</button>
+      <input id="player-input" type="text" placeholder="输入你想做的事情... (Enter发送)" autocomplete="off">
+      <button id="btn-send">发送</button>
+    </div>
+  </div>
+  
+</div>
+
+<!-- Scripts -->
+<script src="js/config.js"></script>
+<script src="js/dice.js"></script>
+<script src="js/characters.js"></script>
+<script src="js/player.js"></script>
+<script src="js/map.js"></script>
+<script src="js/dm.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>

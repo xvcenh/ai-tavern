@@ -1,5 +1,5 @@
-// AI Tavern v2.0 - Utility Functions
-// Shared helpers used across engine and creator
+// SVG Scene Engine - Utility Functions
+// Shared helpers
 
 const Utils = {
   // Deep clone an object

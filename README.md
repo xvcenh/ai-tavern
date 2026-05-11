@@ -1,229 +1,182 @@
-# AI Tavern v2.0 🏰🎲
+# SVG Scene Engine ⚡
 
-**An open-source D&D-style AI town where an LLM acts as Dungeon Master.**
+AI-driven SVG scene composition engine. Describe a scene in natural language, and the engine automatically matches and composites SVG assets to create dynamic visual scenes.
 
-> Walk into a living fantasy town. Talk to NPCs with real personalities. Roll dice. Fight monsters. Go on quests. Every action has consequences — the AI DM remembers everything.
+[![GitHub Pages](https://img.shields.io/badge/Demo-GitHub%20Pages-blue)](https://xvcenh.github.io/svg-scene-engine/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
----
+## What It Does
 
-## ✨ Features
-
-### Core Engine
-- 🗺️ **Living Town Map** — SVG-rendered world with 10+ locations, day/night cycle
-- 🤖 **AI Dungeon Master** — Powered by any OpenAI-compatible LLM (DeepSeek, GPT-4, Ollama, etc.)
-- 👥 **Rich NPCs** — Each with D&D stats, personality, backstory, secrets, daily schedules, and relationships
-- 🎲 **D20 Dice System** — Skill checks, advantage/disadvantage, combat rolls
-- ⚔️ **Turn-Based Combat** — Initiative, AC, damage, spells, status effects
-- 📜 **Dynamic Quests** — AI-generated quests that evolve based on your choices
-- 🌙 **Day/Night Cycle** — Time passes, NPCs follow schedules, scenes change
-- 💾 **Save/Load** — LocalStorage persistence with multiple save slots
-
-### v2.0 New
-- 🎨 **SVG Scene Renderer** — Pure SVG backgrounds, characters, and objects — no raster images
-- 📦 **World Packages** — Modular world data format (meta, lore, rules, NPCs, locations, scenes)
-- 🛠️ **Visual Creator Mode** — Build worlds with drag-and-drop scene editor
-- 🤖 **AI One-Click Generation** — Describe a world concept, AI generates everything (NPCs, scenes, quests)
-- 🎭 **Scene DSL** — JSON-based scene definitions with events, triggers, and conditions
-- 🔌 **Modular Architecture** — Event bus, shared modules, engine/creator split
-- 🌍 **Multilingual** — Full Chinese and English support in world data
-- 🎭 **Extreme Freedom** — Do anything. Type anything. The AI DM handles it.
-
----
-
-## 📸 Screenshots
-
-<!-- TODO: Add screenshots -->
-<!-- ![World Map](screenshots/world-map.png) -->
-<!-- ![NPC Dialogue](screenshots/npc-dialogue.png) -->
-<!-- ![Combat](screenshots/combat.png) -->
-<!-- ![Creator Mode](screenshots/creator-mode.png) -->
-<!-- ![SVG Scene](screenshots/svg-scene.png) -->
-
-*Coming soon — play the game to see it in action!*
-
----
-
-## 🚀 Quick Start
-
-### Play
-
-1. Open `index.html` in your browser
-2. Click the gear icon (⚙️) to configure your AI API
-3. Enter your API endpoint and key (DeepSeek, OpenAI, or any compatible provider)
-4. Create your character
-5. Explore!
-
-### Play Online
-
-**[Play AI Tavern on GitHub Pages](https://xvcenh.github.io/ai-tavern)**
-
-### Creator Mode
-
-Switch to Creator mode to build your own worlds:
-1. Click the mode toggle in the top-right
-2. Use the visual editor to place locations, create NPCs, build scenes
-3. Or click "AI Generate" and describe your world in plain language
-4. Export and share your world package
-
-See [docs/getting-started.md](docs/getting-started.md) for the full guide.
-
----
-
-## 🎮 Controls
-
-| Key / Action        | Effect                          |
-|---------------------|---------------------------------|
-| WASD / Arrow Keys   | Move your character             |
-| Click NPC           | Talk to them                    |
-| Click object        | Interact                        |
-| Space               | Open action menu                |
-| Tab                 | Open character sheet            |
-| R                   | Roll a D20                      |
-| Type anything       | The AI DM will respond          |
-
-The AI Dungeon Master responds to **natural language**:
-- *"I want to sneak into the blacksmith's shop at night"*
-- *"I challenge the stranger to a duel"*
-- *"I ask the innkeeper about the old tower"*
-- *"I cast fireball at the goblins"*
-
----
-
-## 🏗️ Architecture
+SVG Scene Engine takes natural language descriptions and converts them into structured scene commands that render layered SVG compositions:
 
 ```
-ai-tavern/
-├── index.html                  # Main entry point
-├── engine/                     # Game engine
-│   ├── js/
-│   │   ├── core.js             # Engine init, mode management
-│   │   ├── renderer.js         # SVG scene renderer
-│   │   ├── scene-manager.js    # Scene loading & transitions
-│   │   ├── character-ai.js     # NPC management & AI behavior
-│   │   ├── narrative.js        # AI DM narration system
-│   │   ├── combat.js           # Turn-based combat engine
-│   │   ├── dice.js             # D20 dice system
-│   │   └── save-system.js      # Save/load persistence
-│   └── css/
-│       └── engine.css          # Engine styles
-├── creator/                    # World creator tools
-│   └── js/
-│       └── auto-generator.js   # AI one-click world generation
-├── shared/                     # Shared modules
-│   └── js/
-│       ├── event-bus.js        # Decoupled event system
-│       ├── llm-client.js       # LLM API abstraction
-│       └── utils.js            # Utility functions
-├── assets/
-│   └── svg/                    # All visual assets
-│       ├── backgrounds/        # Scene backgrounds (800x500)
-│       ├── characters/         # Character sprites (200x300)
-│       ├── objects/            # Interactive objects (100x100)
-│       └── effects/            # Visual effects
-├── data/
-│   ├── default-world.json      # Default world config (Moonshadow Town)
-│   └── default-scenes.json     # Default scene definitions
-├── examples/
-│   └── moonshadow-town/        # Example world package
-├── js/                         # v1.0 legacy modules (backward compat)
-│   ├── main.js
-│   ├── config.js
-│   ├── dm.js
-│   ├── map.js
-│   ├── characters.js
-│   ├── player.js
-│   ├── dice.js
-│   ├── combat.js
-│   ├── quests.js
-│   └── ui.js
-└── docs/
-    ├── getting-started.md      # Player & creator quick start
-    ├── scene-dsl.md            # Scene DSL specification
-    └── asset-spec.md           # SVG asset specification
+User: "酒馆里，一位吟游诗人在弹奏，商人在喝酒"
+
+→ AI generates scene_update JSON
+→ Engine renders: background(tavern) + characters(bard@25%, merchant@70%) + objects(table, torch)
+→ Animated SVG scene appears
 ```
 
-### Design Principles
+## Features
 
-- **Zero dependencies** — Pure HTML5 + CSS3 + Vanilla JavaScript
-- **Zero build step** — Open `index.html` and it works
-- **Event-driven** — Modules communicate via EventBus, no tight coupling
-- **Data-driven** — Worlds are JSON packages, fully portable
-- **LLM-agnostic** — Any OpenAI-compatible API endpoint works
-- **Progressive enhancement** — Works without AI (manual mode), enhanced with AI
+- **37 SVG assets**: 15 backgrounds, 14 characters, 5 objects, 3 effects
+- **AI scene matching**: LLM converts text to structured scene DSL
+- **Dynamic composition**: Layer-based rendering (background → objects → characters → effects)
+- **Character states**: idle, surprised, eating, drinking, casting, fighting, etc.
+- **Animations**: Walk-in, fade, shock, casting glow, fighting shake
+- **Scene diff**: Only updates what changed (no full re-render)
+- **Zero dependencies**: Pure HTML + JS + CSS
+- **Any LLM**: Works with OpenAI, DeepSeek, MIMO, or any OpenAI-compatible API
 
----
-
-## 🔧 API Setup
-
-Supports any OpenAI-compatible API endpoint:
-
-| Provider   | Endpoint                              | Example Model        |
-|------------|---------------------------------------|----------------------|
-| DeepSeek   | `https://api.deepseek.com/v1`         | `deepseek-chat`      |
-| OpenAI     | `https://api.openai.com/v1`           | `gpt-4o`             |
-| Groq       | `https://api.groq.com/openai/v1`      | `llama-3.3-70b`      |
-| Together   | `https://api.together.xyz/v1`         | `meta-llama/...`     |
-| Ollama     | `http://localhost:11434/v1`           | `llama3`             |
-| LM Studio  | `http://localhost:1234/v1`            | (your model)         |
-
-Configure in-game via the Settings panel (⚙️).
-
----
-
-## 📖 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/getting-started.md) | Player and creator quick start guide |
-| [Scene DSL](docs/scene-dsl.md) | Scene definition format reference |
-| [SVG Asset Spec](docs/asset-spec.md) | How to create and use SVG assets |
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Open an issue or PR.
-
-### Areas for Contribution
-
-- 🎨 **Art** — SVG backgrounds, character sprites, object assets
-- 📖 **Content** — World packages, quests, NPC stories
-- 🧪 **Testing** — Cross-browser testing, API compatibility
-- 🌍 **Localization** — More languages for world data
-- 🔧 **Features** — Mobile optimization, sound, multiplayer
-- 📚 **Docs** — Tutorials, examples, API documentation
-
-### Development
+## Quick Start
 
 ```bash
 # Clone
-git clone https://github.com/xvcenh/ai-tavern.git
-cd ai-tavern
+git clone https://github.com/xvcenh/svg-scene-engine.git
+cd svg-scene-engine
 
-# No build step — just open in browser
+# Open in browser
 open index.html
-
-# Or use a local server (recommended for fetch() calls)
-python -m http.server 8000
-# Then open http://localhost:8000
+# Or serve locally
+python3 -m http.server 8080
 ```
 
-### Code Style
+1. Click ⚙️ Settings to configure your LLM API
+2. Describe a scene in the chat panel
+3. Watch the SVG scene compose dynamically
 
-- Vanilla JavaScript (ES6+), no transpilation
-- Use `EventBus` for inter-module communication
-- Use `LLMClient` for all AI API calls
-- Use `Utils` for shared helpers
-- Keep modules self-contained with `.init()` and `.getState()`/`.setState()`
+## Architecture
 
----
+```
+svg-scene-engine/
+├── index.html              # Demo page
+├── engine/
+│   └── js/
+│       ├── core.js         # Engine initialization & scene API
+│       ├── renderer.js     # SVG rendering, layers, animations
+│       ├── scene-manager.js # Scene DSL, diff, asset matching
+│       └── scene-dsl.js    # LLM instructions & scene examples
+├── shared/
+│   └── js/
+│       ├── event-bus.js    # Decoupled event system
+│       ├── llm-client.js   # LLM API client (OpenAI-compatible)
+│       └── utils.js        # Shared utilities
+├── assets/
+│   └── svg/
+│       ├── backgrounds/    # 15 background scenes
+│       ├── characters/     # 14 character sprites
+│       ├── objects/         # 5 interactive objects
+│       └── effects/        # 3 visual effects
+├── data/
+│   └── default-scenes.json # Example scene configurations
+└── docs/
+    ├── getting-started.md
+    ├── asset-spec.md
+    └── scene-dsl.md
+```
 
-## 📄 License
+## Scene DSL
 
-MIT — do whatever you want, just keep the attribution.
+The engine uses a JSON-based Scene Description Language:
 
----
+```json
+{
+  "scene_update": {
+    "init_scene": {
+      "background": "bg-tavern-interior",
+      "characters": [
+        {"id": "bard", "x": 25, "y": 60, "state": "idle"},
+        {"id": "merchant", "x": 70, "y": 60, "state": "drinking"}
+      ],
+      "objects": [
+        {"id": "table", "x": 45, "y": 65},
+        {"id": "torch", "x": 15, "y": 40}
+      ]
+    }
+  }
+```
 
-*Built with ❤️ by [xvcenh](https://github.com/xvcenh)*
+### Supported Commands
 
-*AI Tavern — Where every adventure is unique.*
+| Command | Description |
+|---------|-------------|
+| `init_scene` | Full scene setup (background + all assets) |
+| `background` | Change background |
+| `add_assets` / `spawn` | Add assets with optional walk-in animation |
+| `remove_assets` / `remove` | Remove assets |
+| `update` / `update_assets` | Modify existing assets (position, state) |
+| `reactions` / `react` | Chain reactions with delays |
+| `effects` | Add visual effects |
+| `clear` | Clear entire scene |
+| `weather` | Set weather effect |
+| `time_phase` | Set time-of-day filter |
+
+## Integration
+
+```javascript
+// 1. Include the scripts
+<script src="shared/js/event-bus.js"></script>
+<script src="shared/js/utils.js"></script>
+<script src="shared/js/llm-client.js"></script>
+<script src="engine/js/scene-dsl.js"></script>
+<script src="engine/js/renderer.js"></script>
+<script src="engine/js/scene-manager.js"></script>
+<script src="engine/js/core.js"></script>
+
+// 2. Configure LLM
+LLMClient.configure({
+  endpoint: 'https://api.openai.com/v1',
+  apiKey: 'sk-...',
+  model: 'gpt-4o-mini'
+});
+
+// 3. Initialize engine
+await Engine.init();
+
+// 4. Describe scenes with natural language
+const result = await Engine.describeScene('森林里，一个战士在和一只羊对峙');
+
+// 5. Or apply scene updates programmatically
+Engine.applyScene({
+  init_scene: {
+    background: 'bg-forest',
+    characters: [
+      { id: 'warrior', x: 30, y: 60 },
+      { id: 'animal-sheep', x: 70, y: 60 }
+    ]
+  }
+});
+
+// 6. Listen for events
+EventBus.on('scene:updated', (scene) => console.log('Scene changed:', scene));
+EventBus.on('asset:added', (data) => console.log('Asset added:', data.id));
+```
+
+## Extending
+
+### Add Custom SVG Assets
+
+Add SVG files to `assets/svg/` and register them in `renderer.js`:
+
+```javascript
+{ id: 'my-asset', path: 'assets/svg/my-asset.svg', layer: 'character', tags: ['custom', 'new'] }
+```
+
+Then update `scene-dsl.js` to include the new asset in the LLM instructions.
+
+### Custom Scene Commands
+
+Add new DSL commands in `scene-manager.js`:
+
+```javascript
+applyUpdate(update) {
+  // ... existing commands ...
+  if (update.my_command) {
+    this._applyMyCommand(update.my_command);
+  }
+}
+```
+
+## License
+
+MIT

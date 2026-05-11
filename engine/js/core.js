@@ -1,134 +1,80 @@
-// AI Tavern v2.0 - Engine Core
-// Mode management, module loading, initialization
+// SVG Scene Engine - Core
+// Lightweight engine for AI-driven SVG scene composition
 
 const Engine = {
-  mode: null,       // 'game' or 'creator'
-  modules: {},
-  worldData: null,  // Current world configuration
   ready: false,
 
-  // Initialize engine in specified mode
-  async init(mode = 'game') {
-    this.mode = mode;
-    console.log(`[Engine] Initializing in ${mode} mode...`);
+  async init() {
+    console.log('[Engine] Initializing SVG Scene Engine...');
 
     // Initialize shared modules
-    Config.init();
-    LLMClient.init(Config);
     EventBus.clear();
+    LLMClient.init();
 
-    // Load world data
-    this.worldData = await this.loadWorldData();
-
-    // Load mode-specific modules
-    if (mode === 'game') {
-      await this.initGameMode();
-    } else if (mode === 'creator') {
-      await this.initCreatorMode();
-    }
-
-    this.ready = true;
-    EventBus.emit('engine:ready', { mode });
-    console.log(`[Engine] Ready.`);
-  },
-
-  async initGameMode() {
-    // Load SVG assets into registry
+    // Load SVG assets into renderer
     await SVGRenderer.init();
 
-    // Load scene manager
+    // Initialize scene manager
     SceneManager.init();
 
-    // Initialize game systems using v1.0 modules (already loaded via script tags)
-    // These are backward-compatible: DM, Player, Map, Combat, Quests, UI, Dice
-    DM.init();
-
-    // Wire up enhanced narrative with scene updates
-    EventBus.on('scene:update', (update) => {
-      SceneManager.applyUpdate(update);
-    });
-
-    EventBus.on('narration:scene', (sceneData) => {
-      SVGRenderer.renderScene(sceneData);
-    });
-
-    // Initialize UI
-    if (typeof UI !== 'undefined') UI.init();
-    const canvas = document.getElementById('game-canvas');
-    if (canvas) Map.init(canvas);
-
-    // Setup input
-    this.setupGameInput();
+    this.ready = true;
+    EventBus.emit('engine:ready');
+    console.log('[Engine] Ready. ' + SVGRenderer.loadedCount + ' SVG assets loaded.');
   },
 
-  async initCreatorMode() {
-    // Load creator modules
-    await SVGRenderer.init();
-    CreatorApp.init();
-  },
-
-  // Load world configuration from data/ or localStorage
-  async loadWorldData() {
-    // Try localStorage first (user's custom world)
-    const saved = localStorage.getItem('ai-tavern-world');
-    if (saved) return JSON.parse(saved);
-
-    // Load default world
-    try {
-      const resp = await fetch('data/default-world.json');
-      if (resp.ok) return await resp.json();
-    } catch (e) {
-      console.warn('[Engine] No world data found, using built-in defaults');
+  /**
+   * Send text to LLM and get structured scene update.
+   * This is the main API: describe a scene in natural language,
+   * and the engine will compose the matching SVG scene.
+   *
+   * @param {string} text - Natural language scene description or user message
+   * @param {Array} history - Optional conversation history
+   * @returns {Object} - { narration, scene_update, choices }
+   */
+  async describeScene(text, history = []) {
+    if (!LLMClient.isReady()) {
+      throw new Error('LLM not configured. Call LLMClient.configure({ endpoint, apiKey, model }) first.');
     }
 
-    // Built-in fallback (the moonshadow town)
-    return this.getDefaultWorld();
+    const systemPrompt = SceneDSL.getSystemPrompt();
+    const messages = [{ role: 'system', content: systemPrompt }];
+
+    // Add recent history
+    for (const entry of history.slice(-10)) {
+      messages.push(entry);
+    }
+
+    messages.push({ role: 'user', content: text });
+
+    const result = await LLMClient.chatStructured(messages);
+
+    // Apply scene update if present
+    if (result.scene_update) {
+      SceneManager.applyUpdate(result.scene_update);
+    }
+
+    return result;
   },
 
-  // Save world data
-  saveWorldData() {
-    localStorage.setItem('ai-tavern-world', JSON.stringify(this.worldData));
-    EventBus.emit('world:saved', this.worldData);
+  /**
+   * Apply a scene update directly (without LLM).
+   * Use this for programmatic scene control.
+   */
+  applyScene(update) {
+    SceneManager.applyUpdate(update);
   },
 
-  // Switch between game and creator mode
-  async switchMode(mode) {
-    if (mode === this.mode) return;
-    console.log(`[Engine] Switching to ${mode} mode...`);
-    this.ready = false;
-
-    // Hide current UI
-    document.getElementById('game-view')?.classList.toggle('hidden', mode !== 'game');
-    document.getElementById('creator-view')?.classList.toggle('hidden', mode !== 'creator');
-
-    await this.init(mode);
+  /**
+   * Get current scene state (for persistence).
+   */
+  getState() {
+    return SceneManager.getState();
   },
 
-  setupGameInput() {
-    const Game = window.Game;
-    if (Game && Game.setupKeyboard) Game.setupKeyboard();
-    if (Game && Game.setupActions) Game.setupActions();
-  },
-
-  // Built-in default world (moonshadow town)
-  getDefaultWorld() {
-    return {
-      meta: {
-        name: '月影镇',
-        genre: 'dark-fantasy',
-        era: 'medieval',
-        language: 'zh-CN',
-        version: '2.0'
-      },
-      lore: {
-        history: '月影镇建于三百年前，坐落在暗语森林和银鳞河之间。每隔几年就有旅人神秘失踪...',
-        magic_system: '基于月相的魔法体系，月圆之夜魔力最强'
-      },
-      rules: {
-        dice_system: 'd20',
-        combat_enabled: true,
-        difficulty: 'normal'
-      }
-    };
+  /**
+   * Restore scene state.
+   */
+  setState(state) {
+    SceneManager.setState(state);
   }
 };

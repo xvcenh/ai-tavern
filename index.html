@@ -3,330 +3,444 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Tavern v2.0 — AI 互动叙事游戏创作工具</title>
-  <link rel="stylesheet" href="engine/css/engine.css">
+  <title>SVG Scene Engine - AI Scene Adapter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      padding: 12px 20px;
+      background: #12121a;
+      border-bottom: 1px solid #2a2a3a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header .status {
+      font-size: 12px;
+      color: #888;
+    }
+    .header .status.ready { color: #4ade80; }
+
+    /* Main layout */
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Scene panel (left) */
+    .scene-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    #scene-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0f172a;
+    }
+
+    /* Chat panel (right) */
+    .chat-panel {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #2a2a3a;
+      background: #12121a;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .chat-msg {
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 90%;
+    }
+    .chat-msg.user {
+      background: #1e3a5f;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg.ai {
+      background: #1a1a2e;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg.system {
+      background: transparent;
+      color: #666;
+      font-size: 12px;
+      text-align: center;
+      max-width: 100%;
+    }
+    .chat-input-area {
+      padding: 12px;
+      border-top: 1px solid #2a2a3a;
+    }
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+    }
+    #chat-input {
+      flex: 1;
+      background: #1a1a2e;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e0e0e0;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+    }
+    #chat-input:focus { border-color: #3b82f6; }
+    #send-btn {
+      background: #3b82f6;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #send-btn:hover { background: #2563eb; }
+    #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Quick actions */
+    .quick-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .quick-btn {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3a;
+      border-radius: 16px;
+      padding: 5px 12px;
+      color: #94a3b8;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .quick-btn:hover { border-color: #3b82f6; color: #e0e0e0; }
+
+    /* Settings modal */
+    .settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .settings-overlay.active { display: flex; }
+    .settings-modal {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3a;
+      border-radius: 12px;
+      padding: 24px;
+      width: 400px;
+      max-width: 90vw;
+    }
+    .settings-modal h2 { margin-bottom: 16px; font-size: 16px; }
+    .settings-modal label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+    .settings-modal input {
+      width: 100%;
+      background: #0f0f1a;
+      border: 1px solid #2a2a3a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e0e0e0;
+      font-size: 13px;
+      outline: none;
+    }
+    .settings-modal input:focus { border-color: #3b82f6; }
+    .settings-modal .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+    .settings-modal button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-save { background: #3b82f6; color: white; }
+    .btn-cancel { background: #2a2a3a; color: #ccc; }
+
+    /* Asset catalog */
+    .catalog-panel {
+      display: none;
+      position: fixed;
+      right: 400px;
+      top: 60px;
+      bottom: 0;
+      width: 280px;
+      background: #12121a;
+      border-left: 1px solid #2a2a3a;
+      overflow-y: auto;
+      z-index: 50;
+      padding: 16px;
+    }
+    .catalog-panel.active { display: block; }
+    .catalog-section h3 {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      margin: 12px 0 8px;
+    }
+    .catalog-item {
+      display: inline-block;
+      background: #1a1a2e;
+      border: 1px solid #2a2a3a;
+      border-radius: 6px;
+      padding: 4px 10px;
+      margin: 2px;
+      font-size: 11px;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .catalog-item:hover { border-color: #3b82f6; color: #e0e0e0; }
+  </style>
 </head>
 <body>
-
-  <!-- ===== TITLE SCREEN ===== -->
-  <div id="title-screen">
-    <div class="title-logo">⚔ AI TAVERN</div>
-    <div class="title-subtitle">AI 互动叙事游戏创作工具 v2.0</div>
-    <div class="title-buttons">
-      <button class="title-btn primary" onclick="selectMode('game')">进入游戏</button>
-      <button class="title-btn" onclick="selectMode('creator')">创作模式</button>
+  <div class="header">
+    <h1>⚡ SVG Scene Engine</h1>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span id="engine-status" class="status">Loading...</span>
+      <button class="quick-btn" onclick="toggleCatalog()">📦 Assets</button>
+      <button class="quick-btn" onclick="openSettings()">⚙️ Settings</button>
     </div>
   </div>
 
-  <!-- ===== MAIN APP ===== -->
-  <div id="app">
-    <!-- Header -->
-    <div id="header">
-      <span class="logo">⚔ AI TAVERN</span>
-      <span class="mode-tag" id="mode-tag">游戏模式</span>
-      <button class="nav-btn" id="btn-game" onclick="switchView('game')">游戏</button>
-      <button class="nav-btn" id="btn-creator" onclick="switchView('creator')">创作</button>
-      <button class="nav-btn" id="btn-save" onclick="Engine.SaveSystem.save()">保存</button>
-      <button class="nav-btn" id="btn-load" onclick="Engine.SaveSystem.load()">读取</button>
+  <div class="main">
+    <div class="scene-panel">
+      <div id="scene-container"></div>
     </div>
 
-    <!-- Body -->
-    <div id="body">
-
-      <!-- Sidebar: Character Sheet -->
-      <div id="sidebar">
-        <div class="char-header">
-          <div class="char-avatar" id="char-avatar">🧙</div>
-          <div class="char-name" id="char-name">旅行者</div>
-          <div class="char-class" id="char-class">冒险者</div>
-        </div>
-
-        <div class="stat-section">
-          <h3>生命值</h3>
-          <div class="stat-row">
-            <span class="stat-label">HP</span>
-            <span class="stat-value red" id="hp-text">100 / 100</span>
-          </div>
-          <div class="hp-bar"><div class="hp-bar-fill" id="hp-bar" style="width:100%"></div></div>
-        </div>
-
-        <div class="stat-section">
-          <h3>魔力</h3>
-          <div class="stat-row">
-            <span class="stat-label">MP</span>
-            <span class="stat-value" id="mp-text" style="color:var(--accent-blue)">50 / 50</span>
-          </div>
-          <div class="mp-bar"><div class="mp-bar-fill" id="mp-bar" style="width:100%"></div></div>
-        </div>
-
-        <div class="stat-section">
-          <h3>属性</h3>
-          <div class="stat-row"><span class="stat-label">力量</span><span class="stat-value" id="stat-str">10</span></div>
-          <div class="stat-row"><span class="stat-label">敏捷</span><span class="stat-value" id="stat-dex">10</span></div>
-          <div class="stat-row"><span class="stat-label">智力</span><span class="stat-value" id="stat-int">10</span></div>
-          <div class="stat-row"><span class="stat-label">感知</span><span class="stat-value" id="stat-wis">10</span></div>
-          <div class="stat-row"><span class="stat-label">体质</span><span class="stat-value" id="stat-con">10</span></div>
-          <div class="stat-row"><span class="stat-label">魅力</span><span class="stat-value" id="stat-cha">10</span></div>
-        </div>
-
-        <div class="stat-section">
-          <h3>状态</h3>
-          <div class="stat-row"><span class="stat-label">等级</span><span class="stat-value gold" id="stat-level">1</span></div>
-          <div class="stat-row"><span class="stat-label">经验</span><span class="stat-value" id="stat-exp">0 / 100</span></div>
-          <div class="stat-row"><span class="stat-label">金币</span><span class="stat-value gold" id="stat-gold">0</span></div>
-        </div>
-
-        <div class="stat-section">
-          <h3>物品栏</h3>
-          <ul class="inventory-list" id="inventory-list">
-            <li><span class="item-name">旅行者之剑</span><span class="item-qty">×1</span></li>
-            <li><span class="item-name">治疗药水</span><span class="item-qty">×3</span></li>
-            <li><span class="item-name">火把</span><span class="item-qty">×5</span></li>
-          </ul>
-        </div>
+    <div class="chat-panel">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-msg system">Describe a scene in natural language, and the AI will compose matching SVG visuals.</div>
       </div>
-
-      <!-- Center: Map + Narration + Input -->
-      <div id="center">
-        <!-- Game View -->
-        <div id="game-view">
-          <div id="map-container">
-            <canvas id="map-canvas" width="768" height="768"></canvas>
-          </div>
-          <div id="narration"></div>
-          <div id="input-area">
-            <input type="text" id="player-input" placeholder="输入你的行动..." autocomplete="off">
-            <button id="send-btn" onclick="handleSend()">发送</button>
-          </div>
-          <div id="action-bar">
-            <button class="action-btn" onclick="handleAction('talk')">💬 对话</button>
-            <button class="action-btn" onclick="handleAction('search')">🔍 搜索</button>
-            <button class="action-btn" onclick="handleAction('rest')">🛏 休息</button>
-            <button class="action-btn" onclick="handleAction('dice')">🎲 骰子</button>
-            <button class="action-btn" onclick="handleAction('inventory')">🎒 物品</button>
-            <button class="action-btn" onclick="handleAction('map')">🗺 地图</button>
-          </div>
+      <div class="chat-input-area">
+        <div class="quick-actions">
+          <button class="quick-btn" onclick="quickScene('酒馆里，一位吟游诗人在弹奏，商人在喝酒')">🍺 酒馆</button>
+          <button class="quick-btn" onclick="quickScene('森林入口，一个战士和一匹马站在路边')">🌲 森林</button>
+          <button class="quick-btn" onclick="quickScene('集市上，商人和卫兵在交谈，远处有一座城堡')">🏰 集市</button>
+          <button class="quick-btn" onclick="quickScene('洞穴中，法师在施法，周围有火焰特效')">🔥 战斗</button>
+          <button class="quick-btn" onclick="clearScene()">🗑️ 清空</button>
         </div>
-
-        <!-- Creator View (hidden by default) -->
-        <div id="creator-view">
-          <div class="creator-section">
-            <h2>🌍 世界观设定</h2>
-            <div class="creator-form">
-              <label>世界名称</label>
-              <input type="text" id="world-name" placeholder="例：艾恩多尔大陆">
-              <label>世界背景描述</label>
-              <textarea id="world-desc" placeholder="描述这个世界的历史、地理、种族..."></textarea>
-            </div>
-          </div>
-          <div class="creator-section">
-            <h2>🎭 角色创建</h2>
-            <div class="creator-form">
-              <label>NPC 名称</label>
-              <input type="text" id="npc-name" placeholder="NPC 名字">
-              <label>角色类型</label>
-              <select id="npc-type">
-                <option value="ally">友方</option>
-                <option value="neutral">中立</option>
-                <option value="enemy">敌对</option>
-                <option value="merchant">商人</option>
-                <option value="quest">任务给予者</option>
-              </select>
-              <label>角色描述</label>
-              <textarea id="npc-desc" placeholder="外貌、性格、背景故事..."></textarea>
-            </div>
-          </div>
-          <div class="creator-section">
-            <h2>📖 剧情编辑</h2>
-            <div class="creator-form">
-              <label>场景名称</label>
-              <input type="text" id="scene-name" placeholder="例：酒馆大厅">
-              <label>场景描述</label>
-              <textarea id="scene-desc" placeholder="玩家进入时看到的描述..."></textarea>
-              <label>触发事件（JSON）</label>
-              <textarea id="scene-events" placeholder='[{"trigger":"enter","action":"npc_speak","npc":"酒馆老板","text":"欢迎，旅行者！"}]'></textarea>
-            </div>
-          </div>
-          <div class="creator-section">
-            <h2>⚔️ 战斗配置</h2>
-            <div class="creator-form">
-              <label>敌人名称</label>
-              <input type="text" id="enemy-name" placeholder="例：哥布林">
-              <label>敌人数据（JSON）</label>
-              <textarea id="enemy-stats" placeholder='{"hp":30,"atk":8,"def":3,"exp":20,"gold":5}'></textarea>
-            </div>
-          </div>
+        <div class="chat-input-row">
+          <textarea id="chat-input" rows="2" placeholder="Describe a scene..."></textarea>
+          <button id="send-btn" onclick="sendMessage()">Send</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Combat Overlay -->
-  <div id="combat-overlay">
-    <div class="combat-panel">
-      <h2>⚔ 战斗！</h2>
-      <div class="combat-enemies" id="combat-enemies"></div>
-      <div class="combat-actions">
-        <button class="combat-action-btn" onclick="Engine.Combat.playerAction('attack')">攻击</button>
-        <button class="combat-action-btn" onclick="Engine.Combat.playerAction('skill')" style="background:var(--accent-blue)">技能</button>
-        <button class="combat-action-btn" onclick="Engine.Combat.playerAction('defend')" style="background:var(--text-muted)">防御</button>
-        <button class="combat-action-btn" onclick="Engine.Combat.playerAction('flee')" style="background:var(--bg-tertiary);color:var(--text-dim);border:1px solid var(--border)">逃跑</button>
+  <!-- Settings modal -->
+  <div class="settings-overlay" id="settings-overlay">
+    <div class="settings-modal">
+      <h2>⚙️ LLM Settings</h2>
+      <label>API Endpoint</label>
+      <input id="cfg-endpoint" placeholder="https://api.openai.com/v1">
+      <label>API Key</label>
+      <input id="cfg-apikey" type="password" placeholder="sk-...">
+      <label>Model</label>
+      <input id="cfg-model" placeholder="gpt-4o-mini">
+      <div class="btn-row">
+        <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
+        <button class="btn-save" onclick="saveSettings()">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
-  <div id="toast-container"></div>
+  <!-- Asset catalog -->
+  <div class="catalog-panel" id="catalog-panel"></div>
 
-  <!-- ===== Shared Modules ===== -->
+  <!-- Scripts (order matters) -->
   <script src="shared/js/event-bus.js"></script>
-  <script src="shared/js/llm-client.js"></script>
   <script src="shared/js/utils.js"></script>
-
-  <!-- ===== Engine Modules ===== -->
-  <script src="engine/js/core.js"></script>
-  <script src="engine/js/dice.js"></script>
+  <script src="shared/js/llm-client.js"></script>
+  <script src="engine/js/scene-dsl.js"></script>
   <script src="engine/js/renderer.js"></script>
   <script src="engine/js/scene-manager.js"></script>
-  <script src="engine/js/narrative.js"></script>
-  <script src="engine/js/character-ai.js"></script>
-  <script src="engine/js/combat.js"></script>
-  <script src="engine/js/save-system.js"></script>
+  <script src="engine/js/core.js"></script>
 
-  <!-- ===== Bootstrap ===== -->
   <script>
-    // Mode selection from title screen
-    function selectMode(mode) {
-      document.getElementById('title-screen').classList.add('hidden');
-      document.getElementById('app').classList.add('visible');
-      if (mode === 'creator') {
-        switchView('creator');
-      } else {
-        switchView('game');
-      }
-      if (typeof Engine !== 'undefined' && Engine.init) {
-        Engine.init(mode);
-      }
+    // ── Chat state ──
+    let conversationHistory = [];
+    let isProcessing = false;
+
+    // ── Init ──
+    async function init() {
+      const statusEl = document.getElementById('engine-status');
+      statusEl.textContent = 'Initializing...';
+
+      LLMClient.loadConfig();
+
+      await Engine.init();
+
+      statusEl.textContent = LLMClient.isReady()
+        ? `Ready (${SVGRenderer.loadedCount} assets)`
+        : 'Configure LLM in Settings ⚙️';
+      statusEl.className = 'status' + (LLMClient.isReady() ? ' ready' : '');
+
+      buildCatalog();
+
+      // Enter to send
+      document.getElementById('chat-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
     }
 
-    // Switch between game and creator views
-    function switchView(view) {
-      const gameView = document.getElementById('game-view');
-      const creatorView = document.getElementById('creator-view');
-      const sidebar = document.getElementById('sidebar');
-      const btnGame = document.getElementById('btn-game');
-      const btnCreator = document.getElementById('btn-creator');
-      const modeTag = document.getElementById('mode-tag');
-
-      if (view === 'creator') {
-        gameView.style.display = 'none';
-        creatorView.classList.add('visible');
-        sidebar.classList.add('hidden');
-        btnGame.classList.remove('active');
-        btnCreator.classList.add('active');
-        modeTag.textContent = '创作模式';
-      } else {
-        gameView.style.display = 'flex';
-        gameView.style.flexDirection = 'column';
-        gameView.style.flex = '1';
-        gameView.style.overflow = 'hidden';
-        creatorView.classList.remove('visible');
-        sidebar.classList.remove('hidden');
-        btnGame.classList.add('active');
-        btnCreator.classList.remove('active');
-        modeTag.textContent = '游戏模式';
-      }
-    }
-
-    // Player input handling
-    function handleSend() {
-      const input = document.getElementById('player-input');
+    // ── Send message ──
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
       const text = input.value.trim();
-      if (!text) return;
-      input.value = '';
+      if (!text || isProcessing) return;
 
-      // Emit via EventBus if available, otherwise add directly
-      if (typeof EventBus !== 'undefined') {
-        EventBus.emit('player:action', { text });
+      input.value = '';
+      addMessage('user', text);
+      isProcessing = true;
+      document.getElementById('send-btn').disabled = true;
+
+      try {
+        const result = await Engine.describeScene(text, conversationHistory);
+
+        conversationHistory.push({ role: 'user', content: text });
+        conversationHistory.push({ role: 'assistant', content: JSON.stringify(result) });
+
+        if (result.narration) {
+          addMessage('ai', result.narration);
+        }
+
+        if (result.choices && result.choices.length > 0) {
+          const choicesHtml = result.choices.map((c, i) =>
+            `<button class="quick-btn" onclick="quickScene('${c.replace(/'/g, "\\'")}')">${i+1}. ${c}</button>`
+          ).join('');
+          addMessage('system', choicesHtml, true);
+        }
+      } catch (err) {
+        addMessage('system', '❌ ' + err.message);
       }
-      addMessage('player', '你', text);
+
+      isProcessing = false;
+      document.getElementById('send-btn').disabled = false;
     }
 
-    // Action buttons
-    function handleAction(action) {
-      const labels = { talk: '对话', search: '搜索四周', rest: '休息恢复', dice: '掷骰子', inventory: '查看物品', map: '展开地图' };
-      const input = document.getElementById('player-input');
-      input.value = labels[action] || action;
+    function quickScene(text) {
+      document.getElementById('chat-input').value = text;
+      sendMessage();
+    }
+
+    function clearScene() {
+      Engine.applyScene({ clear: true });
+      addMessage('system', 'Scene cleared.');
+    }
+
+    function addMessage(type, content, isHtml = false) {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${type}`;
+      if (isHtml) div.innerHTML = content;
+      else div.textContent = content;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // ── Settings ──
+    function openSettings() {
+      const cfg = JSON.parse(localStorage.getItem('svg-scene-engine-config') || '{}');
+      document.getElementById('cfg-endpoint').value = cfg.endpoint || '';
+      document.getElementById('cfg-apikey').value = cfg.apiKey || '';
+      document.getElementById('cfg-model').value = cfg.model || 'gpt-4o-mini';
+      document.getElementById('settings-overlay').classList.add('active');
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-overlay').classList.remove('active');
+    }
+
+    function saveSettings() {
+      LLMClient.configure({
+        endpoint: document.getElementById('cfg-endpoint').value.trim(),
+        apiKey: document.getElementById('cfg-apikey').value.trim(),
+        model: document.getElementById('cfg-model').value.trim()
+      });
+      LLMClient.saveConfig();
+      closeSettings();
+
+      const statusEl = document.getElementById('engine-status');
+      statusEl.textContent = `Ready (${SVGRenderer.loadedCount} assets)`;
+      statusEl.className = 'status ready';
+    }
+
+    // ── Asset Catalog ──
+    function buildCatalog() {
+      const catalog = SceneDSL.getAssetCatalog();
+      const panel = document.getElementById('catalog-panel');
+      let html = '<h3 style="margin-bottom:12px">📦 Asset Catalog</h3>';
+
+      for (const [category, items] of Object.entries(catalog)) {
+        html += `<div class="catalog-section"><h3>${category}</h3>`;
+        for (const item of items) {
+          html += `<span class="catalog-item" onclick="insertAsset('${item}')">${item}</span>`;
+        }
+        html += '</div>';
+      }
+
+      panel.innerHTML = html;
+    }
+
+    function toggleCatalog() {
+      document.getElementById('catalog-panel').classList.toggle('active');
+    }
+
+    function insertAsset(id) {
+      const input = document.getElementById('chat-input');
+      input.value += (input.value ? ' ' : '') + id;
       input.focus();
     }
 
-    // Narration message helper
-    function addMessage(type, speaker, text) {
-      const panel = document.getElementById('narration');
-      const div = document.createElement('div');
-      div.className = 'msg msg-' + type;
-
-      let html = '';
-      if (type === 'npc' || type === 'player') {
-        html += '<span class="speaker">' + speaker + '</span>';
-      }
-      if (type === 'combat') {
-        html += '<span class="combat-icon">⚔</span>';
-      }
-      html += text;
-      div.innerHTML = html;
-
-      panel.appendChild(div);
-      panel.scrollTop = panel.scrollHeight;
-    }
-
-    // Toast notification helper
-    function showToast(message, type) {
-      type = type || 'info';
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast ' + type;
-      toast.textContent = message;
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
-
-    // Character sheet update helper
-    function updateCharSheet(data) {
-      if (data.name) document.getElementById('char-name').textContent = data.name;
-      if (data.cls) document.getElementById('char-class').textContent = data.cls;
-      if (data.avatar) document.getElementById('char-avatar').textContent = data.avatar;
-      if (data.hp !== undefined && data.maxHp !== undefined) {
-        document.getElementById('hp-text').textContent = data.hp + ' / ' + data.maxHp;
-        document.getElementById('hp-bar').style.width = (data.hp / data.maxHp * 100) + '%';
-      }
-      if (data.mp !== undefined && data.maxMp !== undefined) {
-        document.getElementById('mp-text').textContent = data.mp + ' / ' + data.maxMp;
-        document.getElementById('mp-bar').style.width = (data.mp / data.maxMp * 100) + '%';
-      }
-      if (data.str !== undefined) document.getElementById('stat-str').textContent = data.str;
-      if (data.dex !== undefined) document.getElementById('stat-dex').textContent = data.dex;
-      if (data.int !== undefined) document.getElementById('stat-int').textContent = data.int;
-      if (data.wis !== undefined) document.getElementById('stat-wis').textContent = data.wis;
-      if (data.con !== undefined) document.getElementById('stat-con').textContent = data.con;
-      if (data.cha !== undefined) document.getElementById('stat-cha').textContent = data.cha;
-      if (data.level !== undefined) document.getElementById('stat-level').textContent = data.level;
-      if (data.exp !== undefined) document.getElementById('stat-exp').textContent = data.exp;
-      if (data.gold !== undefined) document.getElementById('stat-gold').textContent = data.gold;
-    }
-
-    // Enter key to send
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('player-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          handleSend();
-        }
-      });
-    });
+    // ── Start ──
+    init();
   </script>
 </body>
 </html>

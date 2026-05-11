@@ -1,4 +1,4 @@
-// AI Tavern v2.0 - Event Bus
+// SVG Scene Engine - Event Bus
 // Decoupled inter-module communication
 
 const EventBus = {

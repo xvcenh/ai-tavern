@@ -1,106 +1,119 @@
-// AI Tavern v2.0 - LLM Client
+// SVG Scene Engine - LLM Client
 // Unified LLM API interface with structured output support
+// No external config dependency — configure directly via LLMClient.configure()
 
 const LLMClient = {
-  _config: null,
+  _endpoint: '',
+  _apiKey: '',
+  _model: '',
+  _temperature: 0.4,
+  _maxTokens: 2048,
 
-  init(config) {
-    this._config = config || Config;
+  /**
+   * Configure the LLM client.
+   * @param {Object} config - { endpoint, apiKey, model, temperature?, maxTokens? }
+   */
+  configure(config) {
+    this._endpoint = config.endpoint || '';
+    this._apiKey = config.apiKey || '';
+    this._model = config.model || 'gpt-4o-mini';
+    if (config.temperature !== undefined) this._temperature = config.temperature;
+    if (config.maxTokens !== undefined) this._maxTokens = config.maxTokens;
   },
 
-  getEndpoint() {
-    return this._config.get('apiEndpoint');
+  /**
+   * Load config from localStorage.
+   */
+  loadConfig() {
+    const saved = localStorage.getItem('svg-scene-engine-config');
+    if (saved) {
+      try {
+        this.configure(JSON.parse(saved));
+      } catch (e) { /* ignore */ }
+    }
+  },
+
+  /**
+   * Save config to localStorage.
+   */
+  saveConfig() {
+    localStorage.setItem('svg-scene-engine-config', JSON.stringify({
+      endpoint: this._endpoint,
+      apiKey: this._apiKey,
+      model: this._model,
+      temperature: this._temperature,
+      maxTokens: this._maxTokens
+    }));
+  },
+
+  isReady() {
+    return !!(this._endpoint && this._apiKey);
   },
 
   getHeaders() {
-    return this._config.getHeaders();
-  },
-
-  getConfig() {
     return {
-      model: this._config.get('model'),
-      temperature: this._config.get('temperature'),
-      max_tokens: this._config.get('maxTokens')
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this._apiKey}`
     };
   },
 
   // Basic chat completion
   async chat(messages, options = {}) {
-    const cfg = { ...this.getConfig(), ...options };
+    const model = options.model || this._model;
     const body = {
-      model: cfg.model,
+      model,
       messages,
-      temperature: cfg.temperature,
-      max_tokens: cfg.max_tokens
+      temperature: options.temperature || this._temperature,
+      max_tokens: options.max_tokens || this._maxTokens
     };
 
-    // Add response format if requested (for structured output)
-    if (cfg.response_format) {
-      body.response_format = cfg.response_format;
+    if (options.response_format) {
+      body.response_format = options.response_format;
     }
 
-    // Add tools/functions if provided
-    if (cfg.tools) {
-      body.tools = cfg.tools;
-    }
-
-    const response = await Utils.fetchWithTimeout(
-      `${this.getEndpoint()}/chat/completions`,
-      {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body)
-      },
-      cfg.timeout || 60000
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`LLM API Error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message;
-  },
-
-  // Chat with structured JSON output
-  async chatJSON(messages, schema = null) {
-    const options = {
-      response_format: { type: 'json_object' },
-      temperature: 0.3  // Lower temp for structured output
-    };
-
-    const result = await this.chat(messages, options);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 60000);
 
     try {
-      return JSON.parse(result.content);
-    } catch (e) {
-      console.error('Failed to parse LLM JSON output:', result.content);
-      return null;
+      const response = await fetch(`${this._endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`LLM API Error ${response.status}: ${errText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message;
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('LLM request timed out');
+      throw err;
     }
   },
 
-  // Chat with structured JSON output + schema validation + fallback
+  // Chat with structured JSON output + fallback parsing
   async chatStructured(messages, schema = null) {
-    // Inject a system-level instruction to return valid JSON if not already present
     const structuredMessages = messages.map(m => ({ ...m }));
-    const hasSystemMsg = structuredMessages.some(m => m.role === 'system');
-    if (hasSystemMsg) {
-      // Append JSON instruction to the existing system message
-      const sysIdx = structuredMessages.findIndex(m => m.role === 'system');
-      const jsonInstruction = '\n\n你必须以纯JSON格式回复，不要包含markdown代码块标记。JSON格式如下：\n' +
-        '{"narration": "叙事文本（必填）", "scene_update": {"background": "背景ID", "add_assets": [{"id": "资产ID", "position": {"x": 0, "y": 0}, "animation": "walk-in"}], "remove_assets": [], "effects": []}, "choices": ["选项1", "选项2"], "state_changes": {"key": "value"}}\n' +
-        'narration字段是必填的。其他字段可选，仅在需要更新场景、提供选择或修改状态时包含。';
+
+    // Ensure JSON instruction is in system prompt
+    const sysIdx = structuredMessages.findIndex(m => m.role === 'system');
+    if (sysIdx >= 0) {
       structuredMessages[sysIdx] = {
         ...structuredMessages[sysIdx],
-        content: structuredMessages[sysIdx].content + jsonInstruction
+        content: structuredMessages[sysIdx].content +
+          '\n\n你必须以纯JSON格式回复，不要包含markdown代码块标记。'
       };
     }
 
-    // Request JSON response format
     const options = {
       response_format: { type: 'json_object' },
-      temperature: 0.4
+      temperature: 0.3
     };
 
     const result = await this.chat(structuredMessages, options);
@@ -111,32 +124,27 @@ const LLMClient = {
     try {
       parsed = JSON.parse(rawContent);
     } catch (e) {
-      // Fallback: strip markdown code fences if present
+      // Fallback: strip markdown fences
       try {
         const stripped = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         parsed = JSON.parse(stripped);
       } catch (e2) {
-        console.warn('[LLMClient] JSON parse failed, building fallback structure from plain text.');
+        console.warn('[LLMClient] JSON parse failed, wrapping as narration.');
       }
     }
 
-    // Validate required fields
     if (parsed) {
-      // Ensure narration field exists
-      if (!parsed.narration && typeof parsed === 'object') {
-        // If there's a 'text' or 'content' field, use that as narration
+      if (!parsed.narration) {
         parsed.narration = parsed.text || parsed.content || rawContent;
       }
       return parsed;
     }
 
-    // Final fallback: wrap plain text as structured response
-    console.warn('[LLMClient] Returning fallback structured response.');
+    // Final fallback
     return {
       narration: rawContent,
       scene_update: null,
-      choices: null,
-      state_changes: null
+      choices: null
     };
   },
 
@@ -145,13 +153,7 @@ const LLMClient = {
     const messages = [];
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
     messages.push({ role: 'user', content: prompt });
-
     const result = await this.chat(messages);
     return result.content;
-  },
-
-  // Check if API is configured
-  isReady() {
-    return this._config && this._config.isConfigured();
   }
 };

@@ -546,8 +546,13 @@ const SVGRenderer = {
 
     delete this.characterStates[assetId];
     els.forEach(el => {
-      el.classList.add(`anim-${animation}`);
-      el.addEventListener('animationend', () => el.remove(), { once: true });
+      // Clear existing animations to avoid conflicts
+      el.className = el.className.replace(/anim-\w+/g, '').trim();
+      // Use direct style for reliable removal
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translate(-50%, -100%) scale(0.5)';
+      setTimeout(() => el.remove(), 450);
     });
     EventBus.emit('asset:removed', { id: assetId, count: els.length });
   },

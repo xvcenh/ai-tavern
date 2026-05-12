@@ -5,7 +5,8 @@
 const SceneManager = {
   currentScene: null,
   sceneHistory: [],
-  _sceneAssets: new Map(), // track all currently active asset IDs for diff
+  _sceneAssets: new Map(), // track all currently active assets for diff
+  _instanceCounter: 0,
 
   init() {
     EventBus.on('scene:update', (data) => this.applyUpdate(data));
@@ -204,37 +205,32 @@ const SceneManager = {
     // Auto-space: avoid overlapping entities in the same layer
     if (meta.layer === 'character' || meta.layer === 'object') {
       const MIN_GAP = meta.layer === 'character' ? 12 : 8;
-      const container = SVGRenderer.container;
-      if (container) {
-        const layerClass = meta.layer === 'character' ? '.scene-characters' : '.scene-objects';
-        const layerEl = container.querySelector(layerClass);
-        if (layerEl) {
-          const siblings = layerEl.querySelectorAll('.scene-entity');
-          let attempts = 0;
-          let adjustedX = targetX;
-          while (attempts < 15) {
-            let overlap = false;
-            for (const el of siblings) {
-              const elX = parseFloat(el.style.left);
-              if (Math.abs(elX - adjustedX) < MIN_GAP) {
-                overlap = true;
-                break;
-              }
-            }
-            if (!overlap) { targetX = adjustedX; break; }
-            // Alternate: shift right then left, expanding outward
-            const offset = MIN_GAP * (Math.floor(attempts / 2) + 1);
-            adjustedX = attempts % 2 === 0 ? targetX + offset : targetX - offset;
-            if (adjustedX < 5) adjustedX = 5;
-            if (adjustedX > 95) adjustedX = 95;
-            attempts++;
+      let attempts = 0;
+      let adjustedX = targetX;
+      while (attempts < 15) {
+        let overlap = false;
+        for (const [key, tracked] of this._sceneAssets) {
+          if (key === instanceKey) continue; // skip self only
+          if (tracked._layer !== meta.layer) continue;
+          if (Math.abs(tracked.x - adjustedX) < MIN_GAP) {
+            overlap = true;
+            break;
           }
         }
+        if (!overlap) { targetX = adjustedX; break; }
+        const offset = MIN_GAP * (Math.floor(attempts / 2) + 1);
+        adjustedX = attempts % 2 === 0 ? targetX + offset : targetX - offset;
+        if (adjustedX < 5) adjustedX = 5;
+        if (adjustedX > 95) adjustedX = 95;
+        attempts++;
       }
     }
 
+    const instanceKey = `${asset.id}#${++this._instanceCounter}`;
     const assetData = {
       id: asset.id,
+      _instanceKey: instanceKey,
+      _layer: meta.layer,
       x: targetX,
       y: targetY,
       scale: asset.scale || 1,
@@ -245,22 +241,17 @@ const SceneManager = {
     // Add to scene data
     if (meta.layer === 'character') {
       scene.characters = scene.characters || [];
-      // Prevent duplicates: replace if exists
-      const idx = scene.characters.findIndex(c => c.id === asset.id);
-      if (idx >= 0) scene.characters[idx] = assetData;
-      else scene.characters.push(assetData);
+      scene.characters.push(assetData);
     } else if (meta.layer === 'object') {
       scene.objects = scene.objects || [];
-      const idx = scene.objects.findIndex(o => o.id === asset.id);
-      if (idx >= 0) scene.objects[idx] = assetData;
-      else scene.objects.push(assetData);
+      scene.objects.push(assetData);
     } else if (meta.layer === 'effect') {
       scene.effects = scene.effects || [];
       scene.effects.push(assetData);
     }
 
-    // Track for diff
-    this._sceneAssets.set(asset.id, assetData);
+    // Track for diff (keyed by instance, not id)
+    this._sceneAssets.set(instanceKey, assetData);
 
     // Dynamically add to renderer
     SVGRenderer.addAsset(asset.id, {
@@ -285,7 +276,10 @@ const SceneManager = {
     scene.objects = (scene.objects || []).filter(a => a.id !== assetId);
     scene.effects = (scene.effects || []).filter(a => a.id !== assetId);
 
-    this._sceneAssets.delete(assetId);
+    // Remove all instances with matching ID
+    for (const [key, tracked] of this._sceneAssets) {
+      if (tracked.id === assetId) this._sceneAssets.delete(key);
+    }
     SVGRenderer.removeAsset(assetId);
   },
 

@@ -9,7 +9,7 @@ const Engine = {
 
     // Initialize shared modules
     EventBus.clear();
-    LLMClient.init();
+    LLMClient.loadConfig();
 
     // Load SVG assets into renderer
     await SVGRenderer.init();

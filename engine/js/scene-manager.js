@@ -187,7 +187,11 @@ const SceneManager = {
    * @param {object} scene  - current scene to update
    */
   _applySpawn(asset, scene) {
-    const meta = SVGRenderer.assetMeta[asset.id];
+    let meta = SVGRenderer.assetMeta[asset.id];
+    // Dynamic asset: resolve via renderer (emoji fallback)
+    if (!meta && SVGRenderer._resolveAsset) {
+      meta = SVGRenderer._resolveAsset(asset.id);
+    }
     if (!meta) {
       console.warn(`[SceneManager] Unknown asset: ${asset.id}`);
       return;

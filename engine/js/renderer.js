@@ -1,6 +1,6 @@
-// SVG Scene Engine - Emoji Renderer
-// Renders scenes using emoji compositions on a 2D grid
-// Replaces SVG renderer with zero-dependency emoji-based rendering
+// SVG Scene Engine - Hybrid Renderer
+// SVG assets when available, emoji fallback for everything else
+// Emoji size matches layer type: character > object, effect > character
 
 const SVGRenderer = {
   container: null,
@@ -10,13 +10,35 @@ const SVGRenderer = {
   loadedCount: 0,
   characterStates: {},
   _animationTimers: {},
+  _svgCache: {},        // id -> SVG string
   _layerOrder: ['scene-background', 'scene-objects', 'scene-characters', 'scene-effects'],
 
-  // ── Emoji Asset Registry ──────────────────────────────────────
-  // All 37 "assets" mapped to emoji + styling
+  // ── Layer sizing (pixels at scale=1) ─────────────────────────
+  LAYER_SIZES: {
+    character:  { w: 120, h: 160, emoji: 48 },
+    object:     { w: 80,  h: 80,  emoji: 32 },
+    effect:     { w: 160, h: 160, emoji: 64 },
+  },
 
+  // ── Keyword → emoji for LLM-invented assets ─────────────────
+  KEYWORD_EMOJI: {
+    dragon:'🐉',wolf:'🐺',bear:'🐻',cat:'🐱',dog:'🐶',bird:'🐦',fish:'🐟',
+    spider:'🕷️',snake:'🐍',bat:'🦇',rat:'🐀',eagle:'🦅',lion:'🦁',
+    tree:'🌳',flower:'🌸',rock:'🪨',water:'💧',fire:'🔥',ice:'🧊',
+    door:'🚪',window:'🪟',book:'📖',key:'🔑',coin:'🪙',gem:'💎',
+    crown:'👑',ring:'💍',shield:'🛡️',bow:'🏹',staff:'🪄',axe:'🪓',
+    moon:'🌙',sun:'☀️',star:'⭐',cloud:'☁️',lightning:'⚡',
+    skull:'💀',bone:'🦴',chest:'📦',barrel:'🛢️',rope:'🪢',
+    boat:'⛵',ship:'🏴‍☠️',flag:'🚩',
+    food:'🍗',bread:'🍞',cheese:'🧀',apple:'🍎',meat:'🥩',
+    chair:'🪑',bed:'🛏️',candle:'🕯️',bell:'🔔',
+    ghost:'👻',angel:'👼',demon:'👹',fairy:'🧚',
+    sword:'⚔️',dagger:'🗡️',wand:'🪄',hammer:'🔨',
+  },
+
+  // ── Emoji Asset Registry ──────────────────────────────────────
   EMOJI_MAP: {
-    // Backgrounds (rendered as large emoji + gradient bg)
+    // Backgrounds
     'bg-forest-day':     { emoji: '🌳', gradient: ['#1a4a1a','#2d5a1e','#87ceeb'], label: '森林·白天' },
     'bg-forest-night':   { emoji: '🌲', gradient: ['#0a1a0a','#1a2a1a','#1a1a3a'], label: '森林·夜晚' },
     'bg-tavern-interior':{ emoji: '🍺', gradient: ['#3a2010','#5a3020','#2a1508'], label: '酒馆内部' },
@@ -83,14 +105,43 @@ const SVGRenderer = {
     }
     this._injectStyles();
     this._loadAllAssets();
+    await this._loadSvgAssets();
     this._renderDefaultScene();
-    console.log(`[EmojiRenderer] Loaded ${this.loadedCount} emoji assets`);
+    const svgCount = Object.keys(this._svgCache).length;
+    console.log(`[HybridRenderer] ${this.loadedCount} assets (${svgCount} SVG + ${this.loadedCount - svgCount} emoji-only)`);
+  },
+
+  // ── SVG path builder ──────────────────────────────────────────
+  _buildSvgPath(id, layer) {
+    const dirs = {
+      background: 'assets/svg/backgrounds',
+      character: 'assets/svg/characters',
+      object: 'assets/svg/objects',
+      effect: 'assets/svg/effects',
+    };
+    const name = layer === 'background' ? id.replace(/^bg-/, '') : id;
+    return `${dirs[layer] || 'assets/svg/characters'}/${name}.svg`;
+  },
+
+  // ── Fetch SVG files ──────────────────────────────────────────
+  async _loadSvgAssets() {
+    const promises = [];
+    for (const [id, meta] of Object.entries(this.assetMeta)) {
+      const path = this._buildSvgPath(id, meta.layer);
+      promises.push(
+        fetch(path)
+          .then(r => r.ok ? r.text() : null)
+          .then(svg => { if (svg && svg.includes('<svg')) this._svgCache[id] = svg; })
+          .catch(() => {})
+      );
+    }
+    await Promise.all(promises);
   },
 
   _injectStyles() {
-    if (document.getElementById('emoji-renderer-styles')) return;
+    if (document.getElementById('hybrid-renderer-styles')) return;
     const style = document.createElement('style');
-    style.id = 'emoji-renderer-styles';
+    style.id = 'hybrid-renderer-styles';
     style.textContent = `
       #scene-container {
         position: relative;
@@ -109,6 +160,18 @@ const SVGRenderer = {
         justify-content: center;
         z-index: 1;
         transition: opacity 0.6s ease;
+        overflow: hidden;
+      }
+      .scene-bg .bg-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .scene-bg .bg-svg svg {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
       .scene-bg .bg-emoji {
         font-size: min(40vw, 40vh);
@@ -123,6 +186,7 @@ const SVGRenderer = {
         font-size: 14px;
         color: rgba(255,255,255,0.4);
         letter-spacing: 2px;
+        z-index: 2;
       }
       .scene-bg .bg-grid {
         position: absolute;
@@ -158,12 +222,26 @@ const SVGRenderer = {
                     transform 0.3s ease;
         transform: translate(-50%, -100%);
       }
+
+      /* SVG entity wrapper */
+      .scene-entity .entity-svg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: visible;
+      }
+      .scene-entity .entity-svg svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Emoji entity */
       .scene-entity .entity-emoji {
-        font-size: 48px;
         line-height: 1;
         filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
         transition: transform 0.3s ease, filter 0.3s ease;
       }
+
       .scene-entity .entity-label {
         font-size: 10px;
         color: rgba(255,255,255,0.7);
@@ -179,13 +257,19 @@ const SVGRenderer = {
         animation: overlayPop 0.4s ease;
       }
 
-      /* Effect entities are centered, larger */
+      /* Effect entities */
+      .scene-entity.effect {
+        transform: translate(-50%, -50%);
+        transform-origin: center center;
+      }
       .scene-entity.effect .entity-emoji {
-        font-size: 64px;
+        animation: effectPulse 2s ease-in-out infinite;
+      }
+      .scene-entity.effect .entity-svg {
         animation: effectPulse 2s ease-in-out infinite;
       }
 
-      /* Shadow under characters */
+      /* Shadow under characters/objects */
       .scene-entity .entity-shadow {
         width: 40px;
         height: 12px;
@@ -254,6 +338,33 @@ const SVGRenderer = {
     });
   },
 
+  // ── Resolve asset metadata (known or dynamic) ─────────────────
+  _resolveAsset(id) {
+    if (this.EMOJI_MAP[id]) {
+      return { ...this.assetMeta[id], emoji: this.EMOJI_MAP[id].emoji, known: true };
+    }
+    // Dynamic: guess from keyword
+    const emoji = this.KEYWORD_EMOJI[id] || this._guessEmoji(id);
+    const layer = this._guessLayer(id);
+    return { layer, emoji, tags: [id], origin: 'center-bottom', known: false };
+  },
+
+  _guessEmoji(id) {
+    for (const [keyword, emoji] of Object.entries(this.KEYWORD_EMOJI)) {
+      if (id.includes(keyword)) return emoji;
+    }
+    return '❓';
+  },
+
+  _guessLayer(id) {
+    if (id.startsWith('bg-')) return 'background';
+    const objWords = ['table','chest','torch','sword','potion','door','key','book','barrel','rope','chair','bed','candle','coin','gem','ring','crown','shield','bow','axe','hammer','wand','staff','dagger','food','bread','meat','apple','cheese','bone'];
+    for (const w of objWords) { if (id.includes(w)) return 'object'; }
+    const fxWords = ['fire','fog','smoke','sparkle','rain','snow','glow','light','dark','magic','effect','aura','wind','dust'];
+    for (const w of fxWords) { if (id.includes(w)) return 'effect'; }
+    return 'character';
+  },
+
   // ── Render a complete scene ─────────────────────────────────
 
   renderScene(sceneData) {
@@ -261,10 +372,8 @@ const SVGRenderer = {
     const { background, characters = [], objects = [], effects = [] } = sceneData;
     this.container.innerHTML = '';
 
-    // Background
     this._renderBackground(background);
 
-    // Layers
     const objLayer = this._createLayer('scene-objects');
     const charLayer = this._createLayer('scene-characters');
     const fxLayer = this._createLayer('scene-effects');
@@ -279,18 +388,33 @@ const SVGRenderer = {
 
   _renderBackground(bgId) {
     const bg = this.EMOJI_MAP[bgId];
-    if (!bg) return;
+    const hasSvg = !!this._svgCache[bgId];
+    const label = bg?.label || bgId;
 
     const div = document.createElement('div');
     div.className = 'scene-bg';
-    const colors = bg.gradient || ['#1a1a2e','#16213e','#0f3460'];
-    div.style.background = `linear-gradient(180deg, ${colors.join(', ')})`;
 
-    div.innerHTML = `
-      <div class="bg-grid"></div>
-      <span class="bg-emoji">${bg.emoji}</span>
-      <span class="bg-label">${bg.label || bgId}</span>
-    `;
+    if (hasSvg) {
+      const colors = bg?.gradient || ['#1a1a2e','#16213e','#0f3460'];
+      div.style.background = `linear-gradient(180deg, ${colors.join(', ')})`;
+      div.innerHTML = `
+        <div class="bg-grid"></div>
+        <div class="bg-svg">${this._svgCache[bgId]}</div>
+        <span class="bg-label">${label}</span>
+      `;
+    } else if (bg) {
+      const colors = bg.gradient || ['#1a1a2e','#16213e','#0f3460'];
+      div.style.background = `linear-gradient(180deg, ${colors.join(', ')})`;
+      div.innerHTML = `
+        <div class="bg-grid"></div>
+        <span class="bg-emoji">${bg.emoji}</span>
+        <span class="bg-label">${label}</span>
+      `;
+    } else {
+      div.style.background = 'linear-gradient(180deg, #0a0a1a, #1a1a2e)';
+      div.innerHTML = `<span class="bg-label">${bgId}</span>`;
+    }
+
     this.container.appendChild(div);
   },
 
@@ -301,16 +425,19 @@ const SVGRenderer = {
     return div;
   },
 
+  // ── Main entity renderer (dispatches SVG or emoji) ────────────
+
   _renderEntity(data, layer, type) {
     const id = data.id;
-    const meta = this.EMOJI_MAP[id];
-    if (!meta) return;
+    const resolved = this._resolveAsset(id);
+    if (!resolved) return;
 
+    const hasSvg = !!this._svgCache[id];
+    const meta = this.EMOJI_MAP[id];
     const state = data.state || this.characterStates[id] || 'idle';
 
-    // Get emoji for current state
-    let emoji = meta.emoji;
-    if (meta.states && meta.states[state]) {
+    let emoji = resolved.emoji;
+    if (meta?.states && meta.states[state]) {
       emoji = meta.states[state];
     }
 
@@ -320,26 +447,30 @@ const SVGRenderer = {
     el.style.left = (data.x || 50) + '%';
     el.style.top = (data.y || (type === 'effect' ? 40 : 60)) + '%';
 
-    if (type === 'effect') {
-      el.classList.add('effect');
-      el.style.transform = 'translate(-50%, -50%)';
-      el.style.transformOrigin = 'center center';
-    }
-
+    const layerSize = this.LAYER_SIZES[type] || this.LAYER_SIZES.character;
     const scale = data.scale || 1;
-    const fontSize = type === 'effect' ? 64 : 48;
-    const scaledSize = Math.round(fontSize * scale);
 
-    el.innerHTML = `
-      <span class="entity-emoji" style="font-size:${scaledSize}px">${emoji}</span>
-      ${type !== 'effect' ? '<div class="entity-shadow"></div>' : ''}
-      ${type !== 'effect' ? `<span class="entity-label">${meta.label || id}</span>` : ''}
-    `;
+    if (hasSvg) {
+      // ── SVG rendering ──
+      const w = Math.round(layerSize.w * scale);
+      const h = Math.round(layerSize.h * scale);
+      el.innerHTML = `
+        <div class="entity-svg" style="width:${w}px;height:${h}px">${this._svgCache[id]}</div>
+        ${type !== 'effect' ? '<div class="entity-shadow"></div>' : ''}
+        ${type !== 'effect' ? `<span class="entity-label">${resolved.tags?.[0] || id}</span>` : ''}
+      `;
+    } else {
+      // ── Emoji rendering (size matches layer type) ──
+      const fontSize = Math.round(layerSize.emoji * scale);
+      el.innerHTML = `
+        <span class="entity-emoji" style="font-size:${fontSize}px">${emoji}</span>
+        ${type !== 'effect' ? '<div class="entity-shadow"></div>' : ''}
+        ${type !== 'effect' ? `<span class="entity-label">${resolved.tags?.[0] || id}</span>` : ''}
+      `;
+    }
 
     // Animation
-    if (data.animation) {
-      el.classList.add(`anim-${data.animation}`);
-    }
+    if (data.animation) el.classList.add(`anim-${data.animation}`);
 
     // Walk-in from offscreen
     if (data.fromX !== undefined) {
@@ -355,12 +486,10 @@ const SVGRenderer = {
 
     layer.appendChild(el);
 
-    // Store character state
     if (type === 'character') {
       this.characterStates[id] = state;
     }
 
-    // Spawn particles for effects
     if (type === 'effect' || state === 'casting') {
       this._spawnParticles(el, id);
     }
@@ -370,10 +499,10 @@ const SVGRenderer = {
 
   addAsset(assetId, options = {}) {
     if (!this.container) return;
-    const meta = this.EMOJI_MAP[assetId];
-    if (!meta) return;
+    const resolved = this._resolveAsset(assetId);
+    if (!resolved) return;
 
-    const type = meta.isEffect ? 'effect' : (this.assetMeta[assetId]?.layer === 'object' ? 'object' : 'character');
+    const type = resolved.layer === 'effect' ? 'effect' : (resolved.layer === 'object' ? 'object' : 'character');
     const layerClass = type === 'effect' ? 'scene-effects' : (type === 'object' ? 'scene-objects' : 'scene-characters');
 
     let layer = this.container.querySelector(`.${layerClass}`);
@@ -402,8 +531,15 @@ const SVGRenderer = {
     if (options.x !== undefined) el.style.left = options.x + '%';
     if (options.y !== undefined) el.style.top = options.y + '%';
     if (options.scale !== undefined) {
-      const emoji = el.querySelector('.entity-emoji');
-      if (emoji) emoji.style.fontSize = Math.round(48 * options.scale) + 'px';
+      const svgWrap = el.querySelector('.entity-svg');
+      const emojiEl = el.querySelector('.entity-emoji');
+      const type = el.classList.contains('effect') ? 'effect' : (el.classList.contains('object') ? 'object' : 'character');
+      const layerSize = this.LAYER_SIZES[type] || this.LAYER_SIZES.character;
+      if (svgWrap) {
+        svgWrap.style.width = Math.round(layerSize.w * options.scale) + 'px';
+        svgWrap.style.height = Math.round(layerSize.h * options.scale) + 'px';
+      }
+      if (emojiEl) emojiEl.style.fontSize = Math.round(layerSize.emoji * options.scale) + 'px';
     }
     if (options.state !== undefined) {
       this._updateEntityState(el, assetId, options.state);
@@ -423,25 +559,21 @@ const SVGRenderer = {
     const prevState = this.characterStates[assetId] || 'idle';
     this.characterStates[assetId] = state;
 
-    // Update emoji
     const emojiEl = el.querySelector('.entity-emoji');
     if (emojiEl && meta.states) {
       emojiEl.textContent = meta.states[state] || meta.emoji;
     }
 
-    // Remove old state classes
     el.classList.remove(`state-${prevState}`, `anim-${prevState}`);
     const oldOverlay = el.querySelector('.state-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Apply new state animation
     const animMap = {
       surprised: 'shock', fighting: 'fighting', eating: 'eating',
       casting: 'casting', idle: 'idle'
     };
     if (animMap[state]) el.classList.add(`anim-${animMap[state]}`);
 
-    // State overlay emoji
     const overlayEmoji = this.STATE_EMOJI[state];
     if (overlayEmoji) {
       const overlay = document.createElement('span');

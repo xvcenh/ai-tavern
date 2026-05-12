@@ -20,6 +20,9 @@ User: "酒馆里，一位吟游诗人在弹奏，商人在喝酒"
 ## Features
 
 - **37 SVG assets**: 15 backgrounds, 14 characters, 5 objects, 3 effects
+- **Hybrid rendering**: SVG when available, emoji fallback for everything else
+- **Smart emoji sizing**: Characters 48px, objects 32px, effects 64px — matches visual weight
+- **Dynamic assets**: LLM can use any ID (dragon, wolf, tree...), auto-matched to emoji
 - **AI scene matching**: LLM converts text to structured scene DSL
 - **Dynamic composition**: Layer-based rendering (background → objects → characters → effects)
 - **Character states**: idle, surprised, eating, drinking, casting, fighting, etc.

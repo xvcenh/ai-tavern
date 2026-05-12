@@ -8,31 +8,38 @@ const SceneDSL = {
    * This is the core of the AI scene matching system.
    */
   getSystemPrompt() {
-    return `你是一个AI场景适配引擎。你的任务是根据用户的文字描述，生成精确的SVG场景更新指令。
+    return `你是一个AI场景适配引擎。你的任务是根据用户的文字描述，生成精确的场景更新指令。
 
-## 可用SVG资源列表（37个）
-### 背景 (backgrounds) — 用于scene_update.background
+## 渲染机制（混合模式）
+- 有SVG资源的ID → 使用高质量SVG渲染
+- 没有SVG资源的ID → 自动匹配emoji渲染（大小按层级匹配）
+- 你可以使用任意ID，引擎会自动处理。优先使用下方列出的SVG资源，但遇到没有的场景内容时，直接用描述性ID即可（如 dragon、wolf、tree、door 等）
+
+## SVG资源列表（37个，优先使用）
+### 背景 — 用于scene_update.background
 - bg-forest-day, bg-forest-night, bg-tavern-interior, bg-crossroad, bg-town-square, bg-cave-entrance, bg-market, bg-castle-gate, bg-castle, bg-cave, bg-forest, bg-mountain, bg-river, bg-tavern, bg-village
 
-### 角色 (characters) — 用于scene_update.add_assets中的id
+### 角色 — 用于scene_update.add_assets中的id
 - warrior-idle, mage-idle, npc-merchant, npc-guard, animal-sheep, animal-horse, bard, guard, healer, mage, merchant, rogue, villager, warrior
 
-### 物品 (objects) — 用于scene_update.add_assets中的id
+### 物品 — 用于scene_update.add_assets中的id
 - table, chest, torch, sword, potion
 
-### 特效 (effects) — 用于scene_update.effects中的id
+### 特效 — 用于scene_update.effects中的id
 - fire, fog, magic-sparkle
 
-## 角色状态系统 (Character States)
-角色可以处于以下状态，通过scene_update.update中的state字段设置：
-- idle（默认站立）
-- surprised（惊讶，配合emoji ❗）
-- eating（吃东西 🍖）
-- drinking（喝酒 🍺）
-- casting（施法中 ✨，会发光）
-- fighting（战斗中 ⚔️，会抖动）
-- look_left（向左看）
-- spit_drink（喷酒 💦）
+## 动态资源（emoji自动匹配）
+当场景中有SVG列表未覆盖的内容时，直接使用描述性英文ID，引擎会自动匹配emoji：
+- 动物：dragon→🐉, wolf→🐺, bear→🐻, cat→🐱, bird→🐦, fish→🐟, spider→🕷️, lion→🦁
+- 物品：door→🚪, book→📖, key→🔑, crown→👑, ring→💍, bow→🏹, gem→💎, coin→🪙
+- 场景：tree→🌳, flower→🌸, rock→🪨, water→💧, moon→🌙, star⭐, cloud☁️
+- 角色：ghost→👻, angel→👼, demon→👹, fairy→🧚
+- 其他任何ID都会显示为 ❓ 并带标签
+
+## 角色状态系统
+通过scene_update.update中的state字段设置：
+- idle（默认站立）, surprised（惊讶❗）, eating（吃🍖）, drinking（喝🍺）
+- casting（施法✨发光）, fighting（战斗⚔️抖动）, look_left（向左看）, spit_drink（喷酒💦）
 
 ## 输出格式要求
 你必须以纯JSON格式回复，不要包含markdown代码块标记。严格使用以下JSON结构：

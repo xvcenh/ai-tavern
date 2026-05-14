@@ -57,6 +57,12 @@ const SVGRenderer = {
     effect:     { w: 160, h: 160, emoji: 64 },
   },
 
+  // ── Grid System (16 cols × 9 rows, matching 16:9) ─────────────
+  GRID_COLS: 16,
+  GRID_ROWS: 9,
+  _gridOverlay: null,
+  _showGrid: false,
+
   // ── Keyword → emoji ───────────────────────────────────────────
   KEYWORD_EMOJI: {
     dragon:'🐉',wolf:'🐺',bear:'🐻',cat:'🐱',dog:'🐶',bird:'🐦',fish:'🐟',
@@ -228,7 +234,7 @@ const SVGRenderer = {
     this._renderDefaultScene();
     this.startLoop();
     const svgCount = Object.keys(this._svgCache).length;
-    console.log(`[HybridRenderer] ${this.loadedCount} assets (${svgCount} SVG + ${this.loadedCount - svgCount} emoji-only)`);
+    console.log(`[HybridRenderer] ${this.loadedCount} assets (${svgCount} SVG + ${this.loadedCount - svgCount} emoji-only) | Grid: ${this.GRID_COLS}×${this.GRID_ROWS}`);
   },
 
   // ── DOM structure with parallax layers ────────────────────────
@@ -513,6 +519,13 @@ const SVGRenderer = {
       .letterbox-top { top: 0; }
       .letterbox-bottom { bottom: 0; }
 
+      .grid-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 99;
+        pointer-events: none;
+      }
+
       .light-overlay {
         position: absolute;
         inset: 0;
@@ -650,6 +663,73 @@ const SVGRenderer = {
     return 'character';
   },
 
+  // ── Grid coordinate conversion ────────────────────────────────
+  gridToPercent(gx, gy) {
+    const x = ((gx + 0.5) / this.GRID_COLS) * 100;
+    const y = ((gy + 0.5) / this.GRID_ROWS) * 100;
+    return { x, y };
+  },
+
+  percentToGrid(px, py) {
+    const gx = Math.max(0, Math.min(this.GRID_COLS - 1, Math.floor(px / 100 * this.GRID_COLS)));
+    const gy = Math.max(0, Math.min(this.GRID_ROWS - 1, Math.floor(py / 100 * this.GRID_ROWS)));
+    return { gx, gy };
+  },
+
+  snapToGrid(px, py) {
+    const { gx, gy } = this.percentToGrid(px, py);
+    return this.gridToPercent(gx, gy);
+  },
+
+  getGridCellSize() {
+    if (!this.container) return { w: 60, h: 60 };
+    const rect = this.container.getBoundingClientRect();
+    return {
+      w: rect.width / this.GRID_COLS,
+      h: rect.height / this.GRID_ROWS
+    };
+  },
+
+  showGrid(visible) {
+    this._showGrid = visible;
+    if (visible) {
+      this._renderGridOverlay();
+    } else if (this._gridOverlay) {
+      this._gridOverlay.remove();
+      this._gridOverlay = null;
+    }
+  },
+
+  _renderGridOverlay() {
+    if (this._gridOverlay) this._gridOverlay.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'grid-overlay';
+    overlay.style.cssText = 'position:absolute;inset:0;z-index:99;pointer-events:none;';
+    for (let i = 1; i < this.GRID_COLS; i++) {
+      const line = document.createElement('div');
+      const pct = (i / this.GRID_COLS * 100);
+      line.style.cssText = `position:absolute;left:${pct}%;top:0;width:1px;height:100%;background:rgba(255,255,255,0.15);`;
+      overlay.appendChild(line);
+    }
+    for (let i = 1; i < this.GRID_ROWS; i++) {
+      const line = document.createElement('div');
+      const pct = (i / this.GRID_ROWS * 100);
+      line.style.cssText = `position:absolute;top:${pct}%;left:0;height:1px;width:100%;background:rgba(255,255,255,0.15);`;
+      overlay.appendChild(line);
+    }
+    for (let gx = 0; gx < this.GRID_COLS; gx++) {
+      for (let gy = 0; gy < this.GRID_ROWS; gy++) {
+        const { x, y } = this.gridToPercent(gx, gy);
+        const label = document.createElement('span');
+        label.textContent = `${gx},${gy}`;
+        label.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);font-size:8px;color:rgba(255,255,255,0.25);font-family:monospace;`;
+        overlay.appendChild(label);
+      }
+    }
+    this.container.appendChild(overlay);
+    this._gridOverlay = overlay;
+  },
+
   _composeEntity(id) {
     const lower = id.toLowerCase().replace(/[-_]/g, ' ');
     const parts = lower.split(/\s+/);
@@ -763,8 +843,11 @@ const SVGRenderer = {
     const el = document.createElement('div');
     el.className = `scene-entity ${type}`;
     el.dataset.id = id;
-    el.style.left = (data.x || 50) + '%';
-    el.style.top = (data.y || (type === 'effect' ? 40 : 60)) + '%';
+    const rawX = data.x ?? 50;
+    const rawY = data.y ?? (type === 'effect' ? 40 : 60);
+    const snapped = (type === 'effect') ? { x: rawX, y: rawY } : this.snapToGrid(rawX, rawY);
+    el.style.left = snapped.x + '%';
+    el.style.top = snapped.y + '%';
 
     const layerSize = this.LAYER_SIZES[type] || this.LAYER_SIZES.character;
     const scale = data.scale || 1;
@@ -773,24 +856,28 @@ const SVGRenderer = {
       const compScale = composition.scale || 1;
       const compFilter = composition.filter || '';
       const finalScale = scale * compScale;
-      const fontSize = Math.round(48 * finalScale);
+      const cell = this.getGridCellSize();
+      const baseFontSize = Math.round(Math.min(cell.w, cell.h) * 0.7 * finalScale);
+      const fontSize = Math.max(24, Math.min(120, baseFontSize));
       el.innerHTML = `<div class="composed-wrapper${composition.glow ? ' composed-glow' : ''}" style="transform:scale(${finalScale});filter:${compFilter}">
         <span class="composed-base" style="font-size:${fontSize}px">${composition.base}</span>
       </div>
-      <div class="entity-shadow" style="width:${composition.shadow ? 80 : 40}px;height:${composition.shadow ? 20 : 12}px"></div>
+      <div class="entity-shadow" style="width:${Math.round(cell.w * (composition.shadow ? 0.7 : 0.35))}px;height:${Math.round(cell.h * (composition.shadow ? 0.15 : 0.08))}px"></div>
       <span class="entity-label">${composition.label || id}</span>`;
 
       const wrapper = el.querySelector('.composed-wrapper');
       if (composition.overlays && composition.overlays.length > 0) {
+        const baseSize = Math.min(cell.w, cell.h) * 0.8;
         const overlayPositions = composition.overlays.map((ov, i) => {
-          const angle = (i / composition.overlays.length) * Math.PI * 2;
-          const dist = 25 + Math.random() * 10;
-          return { emoji: ov, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 10 };
+          const angle = (i / composition.overlays.length) * Math.PI * 2 - Math.PI / 2;
+          const dist = baseSize * (0.4 + Math.random() * 0.2);
+          return { emoji: ov, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
         });
         for (const pos of overlayPositions) {
           const span = document.createElement('span');
           span.className = 'composed-overlay';
-          span.style.cssText = `left:${pos.x}px;top:${pos.y}px;font-size:${18 + Math.floor(Math.random() * 8)}px;opacity:${0.6 + Math.random() * 0.4}`;
+          const ovSize = Math.round(baseSize * 0.4 + Math.random() * baseSize * 0.15);
+          span.style.cssText = `left:${pos.x}px;top:${pos.y}px;font-size:${ovSize}px;opacity:${0.6 + Math.random() * 0.4}`;
           span.textContent = pos.emoji;
           wrapper.appendChild(span);
         }
@@ -848,6 +935,14 @@ const SVGRenderer = {
     if (!this.container) return;
     const resolved = this._resolveAsset(assetId);
     if (!resolved) return;
+    if (options.gx !== undefined || options.gy !== undefined) {
+      const { x, y } = this.gridToPercent(
+        options.gx ?? Math.floor(this.GRID_COLS / 2),
+        options.gy ?? Math.floor(this.GRID_ROWS * 0.6)
+      );
+      options.x = x;
+      options.y = y;
+    }
     const type = resolved.layer === 'effect' ? 'effect' : (resolved.layer === 'object' ? 'object' : 'character');
     const layerClass = type === 'effect' ? 'scene-effects' : (type === 'object' ? 'scene-objects' : 'scene-characters');
     const layer = this._layers[layerClass] || this._createLayer(layerClass);

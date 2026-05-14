@@ -188,6 +188,17 @@ const SceneManager = {
    * @param {object} scene  - current scene to update
    */
   _applySpawn(asset, scene) {
+    // Support gx/gy grid coordinates
+    if (asset.gx !== undefined || asset.gy !== undefined) {
+      const grid = SVGRenderer.gridToPercent(
+        asset.gx ?? Math.floor(SVGRenderer.GRID_COLS / 2),
+        asset.gy ?? Math.floor(SVGRenderer.GRID_ROWS * 0.6)
+      );
+      asset.x = grid.x;
+      asset.y = grid.y;
+      if (asset.toX === undefined) asset.toX = grid.x;
+    }
+
     let meta = SVGRenderer.assetMeta[asset.id];
     // Dynamic asset: resolve via renderer (emoji fallback)
     if (!meta && SVGRenderer._resolveAsset) {

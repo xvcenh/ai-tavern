@@ -1,0 +1,3 @@
+[submodule "assets/svg-asset-library"]
+	path = assets/svg-asset-library
+	url = https://github.com/xvcenh/svg-asset-library.git

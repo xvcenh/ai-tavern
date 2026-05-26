@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Tavern - SVG Asset Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a1a;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 20px;
+    }
+    h1 { color: #c9a84c; margin-bottom: 8px; font-size: 24px; }
+    .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
+    
+    /* Test Controls */
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #1a1a2e;
+      color: #c9a84c;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #2a2a4e; border-color: #c9a84c; }
+    .btn.active { background: #3a2a10; border-color: #c9a84c; }
+    
+    /* Scene Container */
+    #scene-container {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 20px;
+    }
+    
+    /* Asset Grid */
+    .asset-section { margin-bottom: 24px; }
+    .asset-section h2 {
+      color: #c9a84c;
+      font-size: 16px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 4px;
+    }
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .asset-card {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .asset-card:hover { border-color: #c9a84c; transform: translateY(-2px); }
+    .asset-card .preview {
+      width: 100%;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .asset-card .preview svg {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .asset-card .preview-bg {
+      height: 80px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .asset-card .preview-bg svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .asset-card .name {
+      font-size: 11px;
+      color: #aaa;
+      word-break: break-all;
+    }
+    .asset-card .status {
+      font-size: 10px;
+      margin-top: 4px;
+    }
+    .status.ok { color: #4ade80; }
+    .status.fail { color: #f87171; }
+    .status.pending { color: #fbbf24; }
+    
+    /* Log */
+    #log {
+      background: #0d0d1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .log-entry { margin-bottom: 2px; }
+    .log-ok { color: #4ade80; }
+    .log-err { color: #f87171; }
+    .log-info { color: #60a5fa; }
+    .log-warn { color: #fbbf24; }
+    
+    /* Summary */
+    .summary {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .summary-item {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px 20px;
+      text-align: center;
+    }
+    .summary-item .num { font-size: 28px; font-weight: bold; color: #c9a84c; }
+    .summary-item .label { font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>🏰 AI Tavern - SVG Asset Integration Test</h1>
+  <p class="subtitle">Testing all SVG assets load and render correctly in the engine</p>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="controls" id="controls"></div>
+  
+  <div id="scene-container"></div>
+
+  <div class="asset-section">
+    <h2>📋 Asset Test Results</h2>
+    <div class="asset-grid" id="asset-grid"></div>
+  </div>
+
+  <div class="asset-section">
+    <h2>📝 Test Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <!-- Engine Scripts -->
+  <script src="shared/js/event-bus.js"></script>
+  <script src="engine/js/renderer-enhanced.js"></script>
+  <script src="engine/js/scene-manager.js"></script>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const gridEl = document.getElementById('asset-grid');
+    const summaryEl = document.getElementById('summary');
+    const controlsEl = document.getElementById('controls');
+
+    const results = { pass: 0, fail: 0, total: 0 };
+    const allAssets = [];
+
+    function log(msg, cls = 'log-info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${cls}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateSummary() {
+      summaryEl.innerHTML = `
+        <div class="summary-item"><div class="num">${results.total}</div><div class="label">Total Assets</div></div>
+        <div class="summary-item"><div class="num" style="color:#4ade80">${results.pass}</div><div class="label">Passed</div></div>
+        <div class="summary-item"><div class="num" style="color:#f87171">${results.fail}</div><div class="label">Failed</div></div>
+        <div class="summary-item"><div class="num">${Object.keys(SVGRenderer._svgCache).length}</div><div class="label">SVGs Loaded</div></div>
+      `;
+    }
+
+    function addAssetCard(id, svgContent, category) {
+      const card = document.createElement('div');
+      card.className = 'asset-card';
+      const isBg = category === 'background';
+      
+      if (svgContent) {
+        const previewClass = isBg ? 'preview-bg' : 'preview';
+        card.innerHTML = `
+          <div class="preview ${previewClass}">${svgContent}</div>
+          <div class="name">${id}</div>
+          <div class="status ok">✓ SVG loaded</div>
+        `;
+        results.pass++;
+      } else {
+        card.innerHTML = `
+          <div class="preview">${SVGRenderer.EMOJI_MAP[id]?.emoji || '❓'}</div>
+          <div class="name">${id}</div>
+          <div class="status fail">✗ No SVG (emoji fallback)</div>
+        `;
+        results.fail++;
+      }
+      results.total++;
+      gridEl.appendChild(card);
+    }
+
+    // Scene presets for testing
+    const testScenes = [
+      { name: '🏘️ Village', scene: { background: 'bg-village', characters: [{id:'villager',x:30,y:60},{id:'guard',x:70,y:60}], objects: [{id:'table',x:50,y:70},{id:'barrel',x:80,y:75}], effects: [] }},
+      { name: '🍺 Tavern', scene: { background: 'bg-tavern-interior', characters: [{id:'bard',x:25,y:55},{id:'merchant',x:50,y:60},{id:'rogue',x:75,y:55}], objects: [{id:'table',x:35,y:70},{id:'torch',x:15,y:40},{id:'potion',x:60,y:75}], effects: [{id:'fire',x:85,y:45}] }},
+      { name: '⚒️ Smithy (NEW)', scene: { background: 'bg-smithy', characters: [{id:'warrior',x:40,y:60},{id:'warrior-combat',x:65,y:55}], objects: [{id:'sword',x:30,y:75},{id:'shield',x:55,y:75},{id:'barrel',x:80,y:70}], effects: [{id:'smoke',x:20,y:30}] }},
+      { name: '🗼 Mage Tower (NEW)', scene: { background: 'bg-mage-tower', characters: [{id:'mage-idle',x:50,y:55},{id:'king',x:30,y:60}], objects: [{id:'scroll',x:40,y:75},{id:'potion',x:65,y:75},{id:'key',x:80,y:70}], effects: [{id:'magic-circle',x:50,y:40},{id:'magic-sparkle',x:30,y:30}] }},
+      { name: '🏜️ Desert (NEW)', scene: { background: 'bg-desert', characters: [{id:'merchant',x:40,y:65},{id:'animal-horse',x:65,y:60}], objects: [{id:'barrel',x:30,y:80},{id:'bow',x:55,y:75}], effects: [] }},
+      { name: '🌲 Forest Night', scene: { background: 'bg-forest-night', characters: [{id:'rogue',x:35,y:55},{id:'healer',x:60,y:60}], objects: [{id:'torch',x:45,y:70}], effects: [{id:'fog',x:50,y:50}] }},
+      { name: '⚔️ Combat', scene: { background: 'bg-cave', characters: [{id:'warrior-combat',x:30,y:55},{id:'mage-idle',x:70,y:55},{id:'rogue',x:50,y:65}], objects: [{id:'chest',x:80,y:75}], effects: [{id:'magic-circle',x:50,y:40},{id:'fire',x:20,y:50}] }},
+      { name: '🌧️ Rain Scene', scene: { background: 'bg-village', characters: [{id:'guard',x:50,y:60}], objects: [{id:'bow',x:35,y:75}], effects: [{id:'rain',x:50,y:30}] }},
+      { name: '👑 Royal Court', scene: { background: 'bg-castle', characters: [{id:'king',x:50,y:55},{id:'guard',x:25,y:60},{id:'guard',x:75,y:60},{id:'mage-idle',x:40,y:65}], objects: [{id:'shield',x:30,y:80},{id:'sword',x:70,y:80}], effects: [{id:'magic-sparkle',x:50,y:30}] }},
+    ];
+
+    // Initialize
+    async function runTests() {
+      log('Initializing SVG Scene Engine...', 'log-info');
+      
+      await SVGRenderer.init();
+      log(`Engine initialized. ${SVGRenderer.loadedCount} total assets registered.`, 'log-ok');
+      log(`${Object.keys(SVGRenderer._svgCache).length} SVG files loaded into cache.`, 'log-ok');
+
+      // Test each asset category
+      const categories = {
+        'Backgrounds': Object.keys(SVGRenderer.EMOJI_MAP).filter(k => k.startsWith('bg-')),
+        'Characters': ['warrior-idle','warrior-combat','mage-idle','king','merchant','guard','villager','bard','healer','rogue','npc-merchant','npc-guard','animal-horse','animal-sheep'],
+        'Objects': ['table','chest','torch','sword','potion','shield','bow','scroll','key','barrel'],
+        'Effects': ['fire','fog','magic-sparkle','rain','smoke','magic-circle'],
+      };
+
+      for (const [cat, ids] of Object.entries(categories)) {
+        log(`\n--- Testing ${cat} ---`, 'log-info');
+        for (const id of ids) {
+          const svg = SVGRenderer._svgCache[id];
+          const emoji = SVGRenderer.EMOJI_MAP[id];
+          if (svg) {
+            // Validate SVG has expected metadata
+            const hasViewBox = svg.includes('viewBox');
+            const hasAssetId = svg.includes('data-asset-id');
+            const hasLayer = svg.includes('data-layer');
+            const hasTags = svg.includes('data-tags');
+            const valid = hasViewBox && hasAssetId && hasLayer && hasTags;
+            if (valid) {
+              log(`  ✓ ${id} - SVG loaded, metadata OK`, 'log-ok');
+            } else {
+              log(`  ⚠ ${id} - SVG loaded but missing metadata (viewBox:${hasViewBox} id:${hasAssetId} layer:${hasLayer} tags:${hasTags})`, 'log-warn');
+            }
+          } else if (emoji) {
+            log(`  ○ ${id} - No SVG, emoji fallback: ${emoji.emoji}`, 'log-warn');
+          } else {
+            log(`  ✗ ${id} - Not found in registry or cache`, 'log-err');
+          }
+          addAssetCard(id, svg, cat.toLowerCase().replace(/s$/, ''));
+        }
+      }
+
+      updateSummary();
+
+      // Build scene buttons
+      for (const preset of testScenes) {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = preset.name;
+        btn.onclick = () => {
+          document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          log(`\nRendering scene: ${preset.name}`, 'log-info');
+          SVGRenderer.currentScene = null; // force re-render
+          SVGRenderer.renderScene(preset.scene);
+          log(`Scene rendered: bg=${preset.scene.background}, chars=${preset.scene.characters.length}, objs=${preset.scene.objects.length}, fx=${preset.scene.effects.length}`, 'log-ok');
+        };
+        controlsEl.appendChild(btn);
+      }
+
+      // Render first scene by default
+      if (testScenes.length > 0) {
+        controlsEl.children[0].click();
+      }
+
+      log(`\n=== TEST COMPLETE ===`, 'log-info');
+      log(`Total: ${results.total} | Passed: ${results.pass} | Failed: ${results.fail}`, results.fail > 0 ? 'log-warn' : 'log-ok');
+    }
+
+    runTests().catch(err => {
+      log(`FATAL: ${err.message}`, 'log-err');
+      console.error(err);
+    });
+  </script>
+</body>
+</html>

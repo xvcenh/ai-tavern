@@ -130,6 +130,22 @@ const SVGRenderer = {
     'fire':          { emoji: '🔥', label: '火焰', isEffect: true },
     'fog':           { emoji: '🌫️', label: '雾气', isEffect: true },
     'magic-sparkle': { emoji: '✨', label: '魔法闪光', isEffect: true },
+    'rain':          { emoji: '🌧️', label: '雨', isEffect: true },
+    'smoke':         { emoji: '💨', label: '烟雾', isEffect: true },
+    'magic-circle':  { emoji: '⭕', label: '法阵', isEffect: true },
+    // New backgrounds
+    'bg-smithy':     { emoji: '⚒️', gradient: ['#2a1a0a','#4a2a10','#1a0a00'], label: '铁匠铺' },
+    'bg-mage-tower': { emoji: '🗼', gradient: ['#1a1030','#2a1a4a','#0a0820'], label: '法师塔' },
+    'bg-desert':     { emoji: '🏜️', gradient: ['#c4a055','#e8c875','#f5e0a0'], label: '沙漠' },
+    // New characters
+    'warrior-combat':{ emoji: '🗡️', label: '战士(战斗)', states: { idle:'🗡️', fighting:'⚔️', surprised:'😵' } },
+    'king':          { emoji: '👑', label: '国王', states: { idle:'👑', surprised:'😨', fighting:'⚔️' } },
+    // New objects
+    'shield':  { emoji: '🛡️', label: '盾牌' },
+    'bow':     { emoji: '🏹', label: '弓' },
+    'scroll':  { emoji: '📜', label: '卷轴' },
+    'key':     { emoji: '🔑', label: '钥匙' },
+    'barrel':  { emoji: '🛢️', label: '木桶' },
   },
 
   // ── Composition keyword modifiers ────────────────────────────
@@ -1062,7 +1078,7 @@ const SVGRenderer = {
     for (const [id, meta] of Object.entries(this.EMOJI_MAP)) {
       this.assets[id] = meta.emoji;
       this.assetMeta[id] = {
-        layer: meta.isEffect ? 'effect' : (['table','chest','torch','sword','potion'].includes(id) ? 'object' : (id.startsWith('bg-') ? 'background' : 'character')),
+        layer: meta.isEffect ? 'effect' : (['table','chest','torch','sword','potion','shield','bow','scroll','key','barrel'].includes(id) ? 'object' : (id.startsWith('bg-') ? 'background' : 'character')),
         tags: [meta.label, id],
         origin: 'center-bottom'
       };

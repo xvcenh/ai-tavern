@@ -208,7 +208,7 @@ const SVGRenderer = {
     'demon-lord':    { base: 'ğŸ‘¹', scale: 2.8, filter: 'saturate(1.5)', overlays: ['ğŸ”¥','ğŸ’€','âš”ï¸'], shadow: true, glow: true, label: 'é­”ç‹' },
     'angel':         { base: 'ğŸ‘¼', scale: 2.2, filter: 'brightness(1.4) saturate(0.5)', overlays: ['âœ¨','âœ¨','ğŸ•Šï¸'], glow: true, label: 'å¤©ä½¿' },
     'mimic':         { base: 'ğŸ“¦', scale: 1.5, overlays: ['ğŸ‘…','ğŸ‘ï¸','ğŸ¦·'], shadow: true, label: 'å®ç®±æ€ª' },
-    'slime-king':    { base: 'ğŸŸ¢', scale: 2.5, filter: 'hue-rotate(100deg)', overlays9DÏQ4ÑPĞ€L@üßvr«²‰¢¶×¢ëh]÷ç]­¢Ö¥ r.startDelay || 0);
+    'slime-king':    { base: 'ğŸŸ¢', scale: 2.5, filter: 'hue-rotate(100deg)', overlays9DÏQ4ÑPĞ€L@üãOvr«²‰¢¶×¢ëh]øÓİ­¢Ö¥ r.startDelay || 0);
     }
   },
 

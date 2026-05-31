@@ -3,310 +3,544 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SVG Scene Engine - AI Scene Adapter</title>
+  <title>SVG Scene Engine — AI 场景合成</title>
   <style>
+    :root {
+      --bg: #08080e;
+      --bg-panel: #0e0e18;
+      --bg-card: #14142a;
+      --bg-input: #1a1a30;
+      --border: #1e1e3a;
+      --border-focus: #4f6ef7;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --text3: #4a5568;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --green: #4ade80;
+      --red: #f87171;
+      --radius: 10px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0f;
-      color: #e0e0e0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
-    /* Header */
+    /* ── Header ── */
     .header {
-      padding: 12px 20px;
-      background: #12121a;
-      border-bottom: 1px solid #2a2a3a;
+      padding: 10px 20px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-shrink: 0;
     }
-    .header h1 {
-      font-size: 18px;
-      font-weight: 600;
-      background: linear-gradient(135deg, #60a5fa, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .header .status {
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text3);
+      letter-spacing: 0.05em;
+    }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text3);
+      display: inline-block;
+      margin-right: 4px;
+    }
+    .status-dot.ready { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-text { font-size: 11px; color: var(--text3); }
+    .status-text.ready { color: var(--green); }
+    .hdr-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      color: var(--text2);
       font-size: 12px;
-      color: #888;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .header .status.ready { color: #4ade80; }
+    .hdr-btn:hover { border-color: var(--accent); color: var(--text); }
 
-    /* Main layout */
+    /* ── Main ── */
     .main {
       flex: 1;
       display: flex;
       overflow: hidden;
     }
 
-    /* Scene panel (left) */
+    /* ── Scene Panel ── */
     .scene-panel {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-width: 0;
+      position: relative;
     }
     #scene-container {
       flex: 1;
       position: relative;
       overflow: hidden;
-      background: #0f172a;
+      background: #080810;
+    }
+    /* Scene overlay info */
+    .scene-info {
+      position: absolute;
+      bottom: 12px; left: 12px;
+      display: flex; gap: 8px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .scene-badge {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--text3);
     }
 
-    /* Chat panel (right) */
+    /* ── Chat Panel ── */
     .chat-panel {
-      width: 380px;
+      width: 400px;
       display: flex;
       flex-direction: column;
-      border-left: 1px solid #2a2a3a;
-      background: #12121a;
+      border-left: 1px solid var(--border);
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+    .chat-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chat-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      letter-spacing: 0.03em;
     }
     .chat-messages {
       flex: 1;
       overflow-y: auto;
       padding: 16px;
+      scroll-behavior: smooth;
     }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
     .chat-msg {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
       padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      line-height: 1.5;
-      max-width: 90%;
+      border-radius: var(--radius);
+      font-size: 13.5px;
+      line-height: 1.6;
+      max-width: 92%;
+      animation: msgIn 0.2s ease-out;
+    }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .chat-msg.user {
-      background: #1e3a5f;
+      background: linear-gradient(135deg, #1e3a5f, #1a2d4a);
       margin-left: auto;
-      border-bottom-right-radius: 4px;
+      border-bottom-right-radius: 3px;
     }
     .chat-msg.ai {
-      background: #1a1a2e;
-      border-bottom-left-radius: 4px;
+      background: var(--bg-card);
+      border-bottom-left-radius: 3px;
+      border: 1px solid var(--border);
     }
     .chat-msg.system {
       background: transparent;
-      color: #666;
-      font-size: 12px;
+      color: var(--text3);
+      font-size: 11px;
       text-align: center;
       max-width: 100%;
+      padding: 4px;
     }
+    .chat-msg.error {
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.2);
+      color: var(--red);
+      font-size: 12px;
+    }
+
+    /* ── Templates Gallery ── */
+    .templates-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .templates-section::-webkit-scrollbar { width: 3px; }
+    .templates-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .templates-title {
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .templates-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .tmpl-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tmpl-card:hover {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.06);
+      transform: translateY(-1px);
+    }
+    .tmpl-icon { font-size: 18px; flex-shrink: 0; }
+    .tmpl-info { min-width: 0; }
+    .tmpl-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tmpl-desc {
+      font-size: 10px;
+      color: var(--text3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .templates-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px;
+      font-size: 10px;
+      color: var(--text3);
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .templates-toggle:hover { color: var(--text2); }
+
+    /* ── Input Area ── */
     .chat-input-area {
-      padding: 12px;
-      border-top: 1px solid #2a2a3a;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
     }
     .chat-input-row {
       display: flex;
       gap: 8px;
+      align-items: flex-end;
     }
     #chat-input {
       flex: 1;
-      background: #1a1a2e;
-      border: 1px solid #2a2a3a;
-      border-radius: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       padding: 10px 14px;
-      color: #e0e0e0;
-      font-size: 14px;
+      color: var(--text);
+      font-size: 13.5px;
       outline: none;
       resize: none;
       font-family: inherit;
+      line-height: 1.5;
+      transition: border-color 0.15s;
     }
-    #chat-input:focus { border-color: #3b82f6; }
+    #chat-input:focus { border-color: var(--border-focus); }
+    #chat-input::placeholder { color: var(--text3); }
     #send-btn {
-      background: #3b82f6;
+      background: var(--accent);
       border: none;
-      border-radius: 8px;
-      padding: 10px 18px;
+      border-radius: var(--radius);
+      width: 40px; height: 40px;
       color: white;
       cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    #send-btn:hover { background: #2563eb; }
-    #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    /* Quick actions */
-    .quick-actions {
+      font-size: 16px;
       display: flex;
-      gap: 6px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-    .quick-btn {
-      background: #1a1a2e;
-      border: 1px solid #2a2a3a;
-      border-radius: 16px;
-      padding: 5px 12px;
-      color: #94a3b8;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .quick-btn:hover { border-color: #3b82f6; color: #e0e0e0; }
-
-    /* Settings modal */
-    .settings-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
       align-items: center;
       justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
     }
-    .settings-overlay.active { display: flex; }
-    .settings-modal {
-      background: #1a1a2e;
-      border: 1px solid #2a2a3a;
-      border-radius: 12px;
-      padding: 24px;
-      width: 400px;
-      max-width: 90vw;
-    }
-    .settings-modal h2 { margin-bottom: 16px; font-size: 16px; }
-    .settings-modal label {
-      display: block;
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 4px;
-      margin-top: 12px;
-    }
-    .settings-modal input {
-      width: 100%;
-      background: #0f0f1a;
-      border: 1px solid #2a2a3a;
-      border-radius: 6px;
-      padding: 8px 12px;
-      color: #e0e0e0;
-      font-size: 13px;
-      outline: none;
-    }
-    .settings-modal input:focus { border-color: #3b82f6; }
-    .settings-modal .btn-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 20px;
-      justify-content: flex-end;
-    }
-    .settings-modal button {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .btn-save { background: #3b82f6; color: white; }
-    .btn-cancel { background: #2a2a3a; color: #ccc; }
+    #send-btn:hover { background: #4f5bd5; transform: scale(1.05); }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-    /* Asset catalog */
-    .catalog-panel {
-      display: none;
-      position: fixed;
-      right: 400px;
-      top: 60px;
-      bottom: 0;
-      width: 280px;
-      background: #12121a;
-      border-left: 1px solid #2a2a3a;
-      overflow-y: auto;
-      z-index: 50;
-      padding: 16px;
-    }
-    .catalog-panel.active { display: block; }
-    .catalog-section h3 {
-      font-size: 12px;
-      color: #888;
-      text-transform: uppercase;
-      margin: 12px 0 8px;
-    }
-    .catalog-item {
-      display: inline-block;
-      background: #1a1a2e;
-      border: 1px solid #2a2a3a;
-      border-radius: 6px;
-      padding: 4px 10px;
-      margin: 2px;
-      font-size: 11px;
-      color: #94a3b8;
-      cursor: pointer;
-    }
-    .catalog-item:hover { border-color: #3b82f6; color: #e0e0e0; }
-
-    /* Streaming cursor */
+    /* ── Streaming ── */
     .stream-cursor {
       animation: cursorBlink 0.8s step-end infinite;
-      color: #60a5fa;
+      color: var(--accent-light);
       font-weight: bold;
+      margin-left: 1px;
     }
     @keyframes cursorBlink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
     }
     .chat-msg[data-streaming="true"] {
-      border-left: 2px solid #3b82f6;
+      border-left: 2px solid var(--accent);
       padding-left: 12px;
+    }
+    .chat-msg[data-streaming="true"] .scene-flash {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-left: 6px;
+      animation: flashPulse 0.6s ease-out;
+      vertical-align: middle;
+    }
+    @keyframes flashPulse {
+      0% { transform: scale(1.5); opacity: 1; }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
+    /* ── Settings Modal ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.active { display: flex; }
+    .modal {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      width: 420px;
+      max-width: 92vw;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+    }
+    .modal h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal label {
+      display: block;
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      margin-top: 14px;
+    }
+    .modal input, .modal select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .modal input:focus { border-color: var(--border-focus); }
+    .modal .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      justify-content: flex-end;
+    }
+    .modal button {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .btn-save { background: var(--accent); color: white; }
+    .btn-save:hover { background: #4f5bd5; }
+    .btn-cancel { background: var(--bg-card); color: var(--text2); border: 1px solid var(--border); }
+    .btn-cancel:hover { border-color: var(--text3); }
+    .preset-row {
+      display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+    }
+    .preset-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-chip:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Catalog Panel ── */
+    .catalog-panel {
+      display: none;
+      position: fixed;
+      right: 420px;
+      top: 50px;
+      bottom: 0;
+      width: 280px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      z-index: 50;
+      padding: 16px;
+    }
+    .catalog-panel.active { display: block; }
+    .catalog-panel h3 {
+      font-size: 12px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 14px 0 6px;
+    }
+    .catalog-panel h3:first-child { margin-top: 0; }
+    .catalog-item {
+      display: inline-block;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      margin: 2px;
+      font-size: 10.5px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .catalog-item:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .chat-panel { width: 100%; }
+      .main { flex-direction: column-reverse; }
+      .scene-panel { min-height: 40vh; }
+      .templates-grid { grid-template-columns: 1fr; }
+      .catalog-panel { right: 0; width: 100%; }
     }
   </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="header">
-    <h1>⚡ SVG Scene Engine</h1>
-    <div style="display:flex;gap:12px;align-items:center;">
-      <span id="engine-status" class="status">Loading...</span>
-      <button class="quick-btn" onclick="toggleCatalog()">📦 Assets</button>
-      <button class="quick-btn" onclick="openSettings()">⚙️ Settings</button>
+    <div class="header-left">
+      <div>
+        <div class="logo">⚡ SVG Scene Engine</div>
+        <div class="logo-sub">AI-DRIVEN SCENE COMPOSITION</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="status-text" id="engine-status">Loading...</span>
+      <button class="hdr-btn" onclick="toggleCatalog()">📦 素材库</button>
+      <button class="hdr-btn" onclick="openSettings()">⚙️ 设置</button>
     </div>
   </div>
 
   <div class="main">
+    <!-- Scene -->
     <div class="scene-panel">
       <div id="scene-container"></div>
+      <div class="scene-info">
+        <div class="scene-badge" id="asset-count">—</div>
+        <div class="scene-badge" id="scene-state">等待输入</div>
+      </div>
     </div>
 
+    <!-- Chat -->
     <div class="chat-panel">
-      <div class="chat-messages" id="chat-messages">
-        <div class="chat-msg system">Describe a scene in natural language, and the AI will compose matching SVG visuals.</div>
+      <div class="chat-header">
+        <h2>💬 场景对话</h2>
+        <button class="hdr-btn" onclick="clearScene()" style="font-size:11px;padding:3px 8px;">🗑️ 清空</button>
       </div>
-      <div class="chat-input-area">
-        <div class="quick-actions">
-          <button class="quick-btn" onclick="quickScene('酒馆里，一位吟游诗人在弹奏，商人在喝酒')">🍺 酒馆</button>
-          <button class="quick-btn" onclick="quickScene('森林入口，一个战士和一匹马站在路边')">🌲 森林</button>
-          <button class="quick-btn" onclick="quickScene('集市上，商人和卫兵在交谈，远处有一座城堡')">🏰 集市</button>
-          <button class="quick-btn" onclick="quickScene('洞穴中，法师在施法，周围有火焰特效')">🔥 战斗</button>
-          <button class="quick-btn" onclick="clearScene()">🗑️ 清空</button>
+
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-msg system">用自然语言描述场景，AI 会实时生成匹配的 SVG 画面。</div>
+      </div>
+
+      <!-- Templates -->
+      <div class="templates-section" id="templates-section">
+        <div class="templates-title">⚡ 快速模板</div>
+        <div class="templates-grid" id="templates-grid"></div>
+        <div class="templates-toggle" onclick="toggleTemplates()">
+          <span id="tmpl-toggle-text">展开更多</span>
+          <span id="tmpl-toggle-arrow">▼</span>
         </div>
+      </div>
+
+      <!-- Input -->
+      <div class="chat-input-area">
         <div class="chat-input-row">
-          <textarea id="chat-input" rows="2" placeholder="Describe a scene..."></textarea>
-          <button id="send-btn" onclick="sendMessage()">Send</button>
+          <textarea id="chat-input" rows="2" placeholder="描述你想要的场景..."></textarea>
+          <button id="send-btn" onclick="sendMessage()" title="发送 (Enter)">▶</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Settings modal -->
-  <div class="settings-overlay" id="settings-overlay">
-    <div class="settings-modal">
-      <h2>⚙️ LLM Settings</h2>
-      <label>API Endpoint</label>
-      <input id="cfg-endpoint" placeholder="https://api.openai.com/v1">
+  <!-- Settings -->
+  <div class="overlay" id="settings-overlay">
+    <div class="modal">
+      <h2>⚙️ LLM 设置</h2>
+      <label>API 端点</label>
+      <input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1">
+      <div class="preset-row">
+        <span class="preset-chip" onclick="fillPreset('https://api.deepseek.com/v1','deepseek-chat')">DeepSeek</span>
+        <span class="preset-chip" onclick="fillPreset('https://api.openai.com/v1','gpt-4o-mini')">OpenAI</span>
+        <span class="preset-chip" onclick="fillPreset('https://api.moonshot.cn/v1','moonshot-v1-8k')">Moonshot</span>
+        <span class="preset-chip" onclick="fillPreset('http://localhost:1234/v1','local')">本地模型</span>
+      </div>
       <label>API Key</label>
       <input id="cfg-apikey" type="password" placeholder="sk-...">
-      <label>Model</label>
-      <input id="cfg-model" placeholder="gpt-4o-mini">
+      <label>模型</label>
+      <input id="cfg-model" placeholder="deepseek-chat">
       <div class="btn-row">
-        <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
-        <button class="btn-save" onclick="saveSettings()">Save</button>
+        <button class="btn-cancel" onclick="closeSettings()">取消</button>
+        <button class="btn-save" onclick="saveSettings()">保存</button>
       </div>
     </div>
   </div>
 
-  <!-- Asset catalog -->
+  <!-- Catalog -->
   <div class="catalog-panel" id="catalog-panel"></div>
 
-  <!-- Scripts (order matters) -->
+  <!-- Scripts -->
   <script src="shared/js/event-bus.js"></script>
   <script src="shared/js/llm-client.js"></script>
   <script src="engine/js/scene-dsl.js"></script>
@@ -315,27 +549,70 @@
   <script src="engine/js/core.js"></script>
 
   <script>
-    // ── Chat state ──
+    // ── Templates ──
+    const TEMPLATES = [
+      { icon: '🍺', name: '酒馆之夜', desc: '吟游诗人弹奏，商人饮酒', text: '酒馆里，一位吟游诗人在弹奏，角落里商人在喝酒，壁炉的火光映在墙上' },
+      { icon: '🌲', name: '森林奇遇', desc: '战士与马，林间小路', text: '森林入口，一个战士牵着马站在路边，远处有几只绵羊在吃草' },
+      { icon: '🏰', name: '城堡集市', desc: '热闹集市，城堡远景', text: '热闹的集市上，商人和卫兵在交谈，远处矗立着一座宏伟的城堡' },
+      { icon: '🔥', name: '洞穴战斗', desc: '法师施法，火焰四起', text: '幽暗洞穴中，法师举起法杖施法，周围燃起熊熊火焰，战士拔剑迎敌' },
+      { icon: '🐉', name: '龙穴探险', desc: '面对巨龙，勇士集结', text: '火山洞穴深处，一条巨龙盘踞在宝藏上，战士和弓箭手小心翼翼地靠近' },
+      { icon: '⛪', name: '大教堂', desc: '神圣殿堂，牧师祈祷', text: '宏伟的大教堂内，牧师在圣坛前祈祷，阳光透过彩色玻璃窗洒下' },
+      { icon: '🌙', name: '墓地之夜', desc: '骷髅苏醒，亡灵涌出', text: '月光下的墓地，骷髅从地下爬出，远处的墓碑间弥漫着诡异的雾气' },
+      { icon: '🏖️', name: '海滩营地', desc: '篝火旁的冒险者', text: '夕阳下的海滩，冒险者围着篝火休息，远处海面上停泊着一艘帆船' },
+      { icon: '📚', name: '法师图书馆', desc: '古老书架，魔法研究', text: '古老的图书馆里，法师正在翻阅魔法卷轴，书架上摆满了发光的药水瓶' },
+      { icon: '❄️', name: '雪山之巅', desc: '暴风雪中的旅人', text: '雪山之巅，暴风雪中一个旅人艰难前行，远处有一座被雪覆盖的小屋' },
+      { icon: '🏺', name: '铁匠铺', desc: '锻造武器，火星四溅', text: '铁匠铺里，铁匠正在铁砧旁锻造一把宝剑，火星四溅，墙上挂满了武器' },
+      { icon: '🌊', name: '海底世界', desc: '深海探险，奇异生物', text: '深海之中，探险者被奇异的水母和发光的鱼群包围，远处有一座沉没的古城' },
+    ];
+
+    let templatesExpanded = false;
+
+    function buildTemplates() {
+      const grid = document.getElementById('templates-grid');
+      const show = templatesExpanded ? TEMPLATES : TEMPLATES.slice(0, 6);
+      grid.innerHTML = show.map(t =>
+        `<div class="tmpl-card" onclick="quickScene('${t.text.replace(/'/g, "\\'")}')" title="${t.text}">
+          <div class="tmpl-icon">${t.icon}</div>
+          <div class="tmpl-info">
+            <div class="tmpl-name">${t.name}</div>
+            <div class="tmpl-desc">${t.desc}</div>
+          </div>
+        </div>`
+      ).join('');
+      document.getElementById('tmpl-toggle-text').textContent = templatesExpanded ? '收起' : '展开更多';
+      document.getElementById('tmpl-toggle-arrow').textContent = templatesExpanded ? '▲' : '▼';
+    }
+
+    function toggleTemplates() {
+      templatesExpanded = !templatesExpanded;
+      buildTemplates();
+    }
+
+    // ── State ──
     let conversationHistory = [];
     let isProcessing = false;
 
     // ── Init ──
     async function init() {
       const statusEl = document.getElementById('engine-status');
-      statusEl.textContent = 'Initializing...';
+      const dotEl = document.getElementById('status-dot');
+      statusEl.textContent = '初始化中...';
 
       LLMClient.loadConfig();
-
       await Engine.init();
 
-      statusEl.textContent = LLMClient.isReady()
-        ? `Ready (${SVGRenderer.loadedCount} assets)`
-        : 'Configure LLM in Settings ⚙️';
-      statusEl.className = 'status' + (LLMClient.isReady() ? ' ready' : '');
+      const ready = LLMClient.isReady();
+      statusEl.textContent = ready
+        ? `${SVGRenderer.loadedCount} 素材就绪`
+        : '请先配置 LLM ⚙️';
+      statusEl.className = 'status-text' + (ready ? ' ready' : '');
+      dotEl.className = 'status-dot' + (ready ? ' ready' : '');
 
+      document.getElementById('asset-count').textContent = `${SVGRenderer.loadedCount} 素材`;
+
+      buildTemplates();
       buildCatalog();
 
-      // Enter to send
       document.getElementById('chat-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -344,7 +621,7 @@
       });
     }
 
-    // ── Send message (streaming) ──
+    // ── Send (streaming) ──
     async function sendMessage() {
       const input = document.getElementById('chat-input');
       const text = input.value.trim();
@@ -354,8 +631,8 @@
       addMessage('user', text);
       isProcessing = true;
       document.getElementById('send-btn').disabled = true;
+      document.getElementById('scene-state').textContent = 'AI 生成中...';
 
-      // Create AI message container for streaming
       const msgDiv = addMessage('ai', '', false, true);
       const cursor = document.createElement('span');
       cursor.className = 'stream-cursor';
@@ -368,43 +645,33 @@
         for await (const update of Engine.describeSceneStream(text, conversationHistory)) {
           if (update.type === 'narration') {
             fullNarration += update.content;
-            // Insert text before cursor
             const textNode = document.createTextNode(update.content);
             msgDiv.insertBefore(textNode, cursor);
-            // Auto-scroll
             msgDiv.parentElement.scrollTop = msgDiv.parentElement.scrollHeight;
           }
           else if (update.type === 'scene') {
-            // Scene updated — add visual feedback
             cursor.style.color = '#4ade80';
-            setTimeout(() => { cursor.style.color = ''; }, 300);
+            const flash = document.createElement('span');
+            flash.className = 'scene-flash';
+            msgDiv.insertBefore(flash, cursor);
+            setTimeout(() => { cursor.style.color = ''; flash.remove(); }, 600);
+            document.getElementById('scene-state').textContent = '场景已更新';
           }
-          else if (update.type === 'done') {
-            break;
-          }
+          else if (update.type === 'done') break;
         }
 
-        // Remove cursor
         cursor.remove();
-
-        // If no narration was extracted, show fallback
         if (!fullNarration && msgDiv.textContent.trim() === '') {
-          msgDiv.textContent = '(Scene updated)';
+          msgDiv.textContent = '(场景已更新)';
         }
 
         conversationHistory.push({ role: 'user', content: text });
         conversationHistory.push({ role: 'assistant', content: fullNarration });
 
-        // Note: choices are not streamed (would need full JSON), so we skip them in streaming mode
-        // Users can continue the conversation naturally
-
       } catch (err) {
         cursor.remove();
-        if (msgDiv.textContent.trim() === '') {
-          msgDiv.textContent = '❌ ' + err.message;
-        } else {
-          msgDiv.textContent += '\n❌ ' + err.message;
-        }
+        msgDiv.className = 'chat-msg error';
+        msgDiv.textContent = '❌ ' + err.message;
       }
 
       isProcessing = false;
@@ -418,20 +685,18 @@
 
     function clearScene() {
       Engine.applyScene({ clear: true });
-      addMessage('system', 'Scene cleared.');
+      conversationHistory = [];
+      addMessage('system', '场景已清空，对话已重置。');
+      document.getElementById('scene-state').textContent = '等待输入';
     }
 
     function addMessage(type, content, isHtml = false, isStreaming = false) {
       const container = document.getElementById('chat-messages');
       const div = document.createElement('div');
       div.className = `chat-msg ${type}`;
-      if (isStreaming) {
-        div.setAttribute('data-streaming', 'true');
-      } else if (isHtml) {
-        div.innerHTML = content;
-      } else {
-        div.textContent = content;
-      }
+      if (isStreaming) div.setAttribute('data-streaming', 'true');
+      else if (isHtml) div.innerHTML = content;
+      else div.textContent = content;
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
       return div;
@@ -442,14 +707,12 @@
       const cfg = JSON.parse(localStorage.getItem('svg-scene-engine-config') || '{}');
       document.getElementById('cfg-endpoint').value = cfg.endpoint || '';
       document.getElementById('cfg-apikey').value = cfg.apiKey || '';
-      document.getElementById('cfg-model').value = cfg.model || 'gpt-4o-mini';
+      document.getElementById('cfg-model').value = cfg.model || 'deepseek-chat';
       document.getElementById('settings-overlay').classList.add('active');
     }
-
     function closeSettings() {
       document.getElementById('settings-overlay').classList.remove('active');
     }
-
     function saveSettings() {
       LLMClient.configure({
         endpoint: document.getElementById('cfg-endpoint').value.trim(),
@@ -458,33 +721,34 @@
       });
       LLMClient.saveConfig();
       closeSettings();
-
-      const statusEl = document.getElementById('engine-status');
-      statusEl.textContent = `Ready (${SVGRenderer.loadedCount} assets)`;
-      statusEl.className = 'status ready';
+      const ready = LLMClient.isReady();
+      document.getElementById('engine-status').textContent = ready
+        ? `${SVGRenderer.loadedCount} 素材就绪` : '请先配置 LLM ⚙️';
+      document.getElementById('engine-status').className = 'status-text' + (ready ? ' ready' : '');
+      document.getElementById('status-dot').className = 'status-dot' + (ready ? ' ready' : '');
+    }
+    function fillPreset(endpoint, model) {
+      document.getElementById('cfg-endpoint').value = endpoint;
+      document.getElementById('cfg-model').value = model;
     }
 
-    // ── Asset Catalog ──
+    // ── Catalog ──
     function buildCatalog() {
       const catalog = SceneDSL.getAssetCatalog();
       const panel = document.getElementById('catalog-panel');
-      let html = '<h3 style="margin-bottom:12px">📦 Asset Catalog</h3>';
-
-      for (const [category, items] of Object.entries(catalog)) {
-        html += `<div class="catalog-section"><h3>${category}</h3>`;
+      let html = '';
+      const labels = { backgrounds:'背景', characters:'角色', creatures:'生物', objects:'物品', effects:'特效', states:'状态' };
+      for (const [cat, items] of Object.entries(catalog)) {
+        html += `<h3>${labels[cat] || cat}</h3>`;
         for (const item of items) {
           html += `<span class="catalog-item" onclick="insertAsset('${item}')">${item}</span>`;
         }
-        html += '</div>';
       }
-
       panel.innerHTML = html;
     }
-
     function toggleCatalog() {
       document.getElementById('catalog-panel').classList.toggle('active');
     }
-
     function insertAsset(id) {
       const input = document.getElementById('chat-input');
       input.value += (input.value ? ' ' : '') + id;

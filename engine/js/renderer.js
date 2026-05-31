@@ -11,6 +11,8 @@ const SVGRenderer = {
   characterStates: {},
   _animationTimers: {},
   _svgCache: {},        // id -> SVG string
+  _libraryManifest: [],  // loaded from asset-library manifest
+  _LIBRARY_BASE: 'assets/svg-asset-library/assets',
   _layerOrder: ['scene-background', 'scene-objects', 'scene-characters', 'scene-effects'],
 
   // ── Layer sizing (pixels at scale=1) ─────────────────────────
@@ -132,13 +134,14 @@ const SVGRenderer = {
     }
     this._injectStyles();
     this._loadAllAssets();
+    await this._loadAssetLibrary();
     await this._loadSvgAssets();
     this._renderDefaultScene();
     const svgCount = Object.keys(this._svgCache).length;
     console.log(`[HybridRenderer] ${this.loadedCount} assets (${svgCount} SVG + ${this.loadedCount - svgCount} emoji-only)`);
   },
 
-  // ── SVG path builder ──────────────────────────────────────────
+  // ── SVG path builder (engine assets) ────────────────────────────
   _buildSvgPath(id, layer) {
     const dirs = {
       background: 'assets/svg/backgrounds',
@@ -150,8 +153,23 @@ const SVGRenderer = {
     return `${dirs[layer] || 'assets/svg/characters'}/${name}.svg`;
   },
 
+  // ── SVG path builder (asset-library) ──────────────────────────
+  _buildLibraryPath(id, layer) {
+    // Library uses consistent directory names
+    const dirs = {
+      background: `${this._LIBRARY_BASE}/backgrounds`,
+      character:  `${this._LIBRARY_BASE}/characters`,
+      creature:   `${this._LIBRARY_BASE}/creatures`,
+      object:     `${this._LIBRARY_BASE}/objects`,
+      effect:     `${this._LIBRARY_BASE}/effects`,
+      item:       `${this._LIBRARY_BASE}/items`,
+    };
+    return `${dirs[layer] || dirs.character}/${id}.svg`;
+  },
+
   // ── Fetch SVG files ──────────────────────────────────────────
   async _loadSvgAssets() {
+    // Load engine's own SVGs first
     const promises = [];
     for (const [id, meta] of Object.entries(this.assetMeta)) {
       const path = this._buildSvgPath(id, meta.layer);
@@ -163,6 +181,72 @@ const SVGRenderer = {
       );
     }
     await Promise.all(promises);
+
+    // Then load library SVGs for registered assets
+    const libPromises = [];
+    for (const asset of this._libraryManifest) {
+      if (this._svgCache[asset.id]) continue; // already have engine SVG
+      const libLayer = asset.layer;
+      const path = this._buildLibraryPath(asset.id, libLayer);
+      libPromises.push(
+        fetch(path)
+          .then(r => r.ok ? r.text() : null)
+          .then(svg => { if (svg && svg.includes('<svg')) this._svgCache[asset.id] = svg; })
+          .catch(() => {})
+      );
+    }
+    await Promise.all(libPromises);
+  },
+
+  // ── Load asset-library manifest and register assets ──────────
+  async _loadAssetLibrary() {
+    try {
+      const resp = await fetch('assets/svg-asset-library/manifest.json');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      this._libraryManifest = data.assets || [];
+
+      // Map library layer names to engine layer names
+      const layerMap = {
+        background: 'background',
+        character:  'character',
+        creature:   'character',   // creatures render as characters
+        object:     'object',
+        effect:     'effect',
+        item:       'object',      // items render as objects
+      };
+
+      for (const asset of this._libraryManifest) {
+        const engineLayer = layerMap[asset.layer] || 'character';
+        // Skip if already registered by engine's own EMOJI_MAP
+        if (this.assetMeta[asset.id]) continue;
+
+        // Register in assetMeta
+        this.assetMeta[asset.id] = {
+          layer: engineLayer,
+          tags: (asset.tags || '').split(',').concat([asset.id]),
+          origin: engineLayer === 'effect' ? 'center-center' : 'center-bottom',
+          source: 'library',
+        };
+
+        // Register in EMOJI_MAP with keyword-guessed emoji fallback
+        if (!this.EMOJI_MAP[asset.id]) {
+          const emoji = this.KEYWORD_EMOJI[asset.id] || this._guessEmoji(asset.id);
+          this.EMOJI_MAP[asset.id] = {
+            emoji: emoji,
+            label: asset.id.replace(/[-_]/g, ' '),
+          };
+          this.assets[asset.id] = emoji;
+        }
+
+        this.loadedCount++;
+      }
+
+      const svgDir = this._LIBRARY_BASE;
+      console.log(`[HybridRenderer] Asset library loaded: ${this._libraryManifest.length} assets registered`);
+    } catch (e) {
+      console.warn('[HybridRenderer] Failed to load asset library:', e);
+    }
   },
 
   _injectStyles() {

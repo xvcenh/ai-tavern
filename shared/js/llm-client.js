@@ -155,5 +155,73 @@ const LLMClient = {
     messages.push({ role: 'user', content: prompt });
     const result = await this.chat(messages);
     return result.content;
+  },
+
+  /**
+   * Streaming chat — yields tokens as they arrive.
+   * @param {Array} messages
+   * @param {Object} options
+   * @yields {{ type: 'token'|'done', content: string }}
+   */
+  async *chatStream(messages, options = {}) {
+    const model = options.model || this._model;
+    const body = {
+      model,
+      messages,
+      stream: true,
+      temperature: options.temperature || this._temperature,
+      max_tokens: options.max_tokens || this._maxTokens
+    };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 120000);
+
+    try {
+      const response = await fetch(`${this._endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`LLM API Error ${response.status}: ${errText}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') { yield { type: 'done', content: '' }; return; }
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta?.content) {
+              yield { type: 'token', content: delta.content };
+            }
+          } catch (e) { /* skip malformed chunks */ }
+        }
+      }
+      yield { type: 'done', content: '' };
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('LLM request timed out');
+      throw err;
+    }
   }
 };

@@ -234,6 +234,21 @@
       cursor: pointer;
     }
     .catalog-item:hover { border-color: #3b82f6; color: #e0e0e0; }
+
+    /* Streaming cursor */
+    .stream-cursor {
+      animation: cursorBlink 0.8s step-end infinite;
+      color: #60a5fa;
+      font-weight: bold;
+    }
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .chat-msg[data-streaming="true"] {
+      border-left: 2px solid #3b82f6;
+      padding-left: 12px;
+    }
   </style>
 </head>
 <body>
@@ -329,7 +344,7 @@
       });
     }
 
-    // ── Send message ──
+    // ── Send message (streaming) ──
     async function sendMessage() {
       const input = document.getElementById('chat-input');
       const text = input.value.trim();
@@ -340,24 +355,56 @@
       isProcessing = true;
       document.getElementById('send-btn').disabled = true;
 
+      // Create AI message container for streaming
+      const msgDiv = addMessage('ai', '', false, true);
+      const cursor = document.createElement('span');
+      cursor.className = 'stream-cursor';
+      cursor.textContent = '▋';
+      msgDiv.appendChild(cursor);
+
+      let fullNarration = '';
+
       try {
-        const result = await Engine.describeScene(text, conversationHistory);
+        for await (const update of Engine.describeSceneStream(text, conversationHistory)) {
+          if (update.type === 'narration') {
+            fullNarration += update.content;
+            // Insert text before cursor
+            const textNode = document.createTextNode(update.content);
+            msgDiv.insertBefore(textNode, cursor);
+            // Auto-scroll
+            msgDiv.parentElement.scrollTop = msgDiv.parentElement.scrollHeight;
+          }
+          else if (update.type === 'scene') {
+            // Scene updated — add visual feedback
+            cursor.style.color = '#4ade80';
+            setTimeout(() => { cursor.style.color = ''; }, 300);
+          }
+          else if (update.type === 'done') {
+            break;
+          }
+        }
+
+        // Remove cursor
+        cursor.remove();
+
+        // If no narration was extracted, show fallback
+        if (!fullNarration && msgDiv.textContent.trim() === '') {
+          msgDiv.textContent = '(Scene updated)';
+        }
 
         conversationHistory.push({ role: 'user', content: text });
-        conversationHistory.push({ role: 'assistant', content: JSON.stringify(result) });
+        conversationHistory.push({ role: 'assistant', content: fullNarration });
 
-        if (result.narration) {
-          addMessage('ai', result.narration);
-        }
+        // Note: choices are not streamed (would need full JSON), so we skip them in streaming mode
+        // Users can continue the conversation naturally
 
-        if (result.choices && result.choices.length > 0) {
-          const choicesHtml = result.choices.map((c, i) =>
-            `<button class="quick-btn" onclick="quickScene('${c.replace(/'/g, "\\'")}')">${i+1}. ${c}</button>`
-          ).join('');
-          addMessage('system', choicesHtml, true);
-        }
       } catch (err) {
-        addMessage('system', '❌ ' + err.message);
+        cursor.remove();
+        if (msgDiv.textContent.trim() === '') {
+          msgDiv.textContent = '❌ ' + err.message;
+        } else {
+          msgDiv.textContent += '\n❌ ' + err.message;
+        }
       }
 
       isProcessing = false;
@@ -374,14 +421,20 @@
       addMessage('system', 'Scene cleared.');
     }
 
-    function addMessage(type, content, isHtml = false) {
+    function addMessage(type, content, isHtml = false, isStreaming = false) {
       const container = document.getElementById('chat-messages');
       const div = document.createElement('div');
       div.className = `chat-msg ${type}`;
-      if (isHtml) div.innerHTML = content;
-      else div.textContent = content;
+      if (isStreaming) {
+        div.setAttribute('data-streaming', 'true');
+      } else if (isHtml) {
+        div.innerHTML = content;
+      } else {
+        div.textContent = content;
+      }
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
+      return div;
     }
 
     // ── Settings ──
